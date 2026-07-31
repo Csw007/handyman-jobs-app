@@ -1,0 +1,2654 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FFFFFF">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Jobs">
+<title>Jobs</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+<style>
+  :root{
+    --bg:#FFFFFF;
+    --inset:#F4F5F7;
+    --inset-2:#EAEDF1;
+    --line:#E6E8EC;
+    --ink:#0E1116;
+    --ink-2:#5B646E;
+    --ink-3:#909AA4;
+    --accent:#F5B301;
+    --go:#15794F;
+    --stop:#C0362C;
+    --blue:#1B6FD4;
+    --raised:#FFFFFF;
+    --on-ink:#FFFFFF;
+    --on-accent:#0E1116;
+    --stop-bg:#C0362C;
+    --on-stop:#FFFFFF;
+    --glass:rgba(255,255,255,.86);
+    --bg-0:rgba(255,255,255,0);
+    --warn-bg:#FFF6E0;
+    --warn-fg:#6B4E00;
+    --meh:#B07D00;
+    --scrim:rgba(14,17,22,.42);
+    --shadow-1:0 1px 3px rgba(14,17,22,.09);
+    --focus-ring:rgba(14,17,22,.07);
+    --tile-filter:none;
+    --r-s:10px; --r-m:14px; --r-l:20px;
+    --tap:44px; --pad:20px;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font:400 16px/1.5 var(--sans);
+    -webkit-font-smoothing:antialiased;
+    -webkit-tap-highlight-color:transparent;
+    padding-bottom:calc(150px + env(safe-area-inset-bottom));
+    min-height:100vh;
+  }
+  button,input,textarea,select{font:inherit; color:inherit}
+
+  /* ---------- type ---------- */
+  .h1{font-size:30px; line-height:1.1; font-weight:700; letter-spacing:-.03em; margin:0 0 20px}
+  .lbl{display:block; font-size:13px; font-weight:500; color:var(--ink-2); margin-bottom:7px}
+  .meta{font-family:var(--mono); font-size:11px; letter-spacing:.02em; color:var(--ink-3); font-variant-numeric:tabular-nums}
+  .hint{font-size:13px; line-height:1.5; color:var(--ink-2); margin:10px 0 0}
+  .shead{
+    font-size:13px; font-weight:600; color:var(--ink-3);
+    margin:32px 0 12px; letter-spacing:-.005em;
+  }
+
+  /* ---------- header ---------- */
+  header{
+    position:sticky; top:0; z-index:40;
+    background:var(--glass);
+    -webkit-backdrop-filter:saturate(180%) blur(16px);
+    backdrop-filter:saturate(180%) blur(16px);
+    padding:calc(8px + env(safe-area-inset-top)) var(--pad) 8px;
+    display:flex; align-items:center; gap:10px;
+    border-bottom:1px solid transparent;
+    transition:border-color .15s ease;
+  }
+  header.scrolled{border-bottom-color:var(--line)}
+  .brand{
+    font-size:17px; font-weight:600; letter-spacing:-.02em;
+    flex:1 1 auto; min-width:0;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .icon-btn{
+    appearance:none; border:0; background:transparent; cursor:pointer;
+    color:var(--ink-2); min-width:var(--tap); min-height:var(--tap);
+    display:grid; place-items:center; border-radius:var(--r-s); margin-right:-8px;
+  }
+  .icon-btn svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+  .icon-btn:active{background:var(--inset)}
+
+  /* ---------- layout ---------- */
+  main{padding:22px var(--pad) 0; max-width:600px; margin:0 auto}
+  .view[hidden]{display:none}
+
+  /* ---------- segmented control ---------- */
+  .seg{
+    display:flex; background:var(--inset); border-radius:var(--r-s);
+    padding:3px; gap:3px; margin-bottom:6px;
+  }
+  .seg button{
+    flex:1 1 0; appearance:none; border:0; background:transparent; cursor:pointer;
+    font-size:14px; font-weight:500; color:var(--ink-2);
+    padding:8px 6px; min-height:38px; border-radius:8px; letter-spacing:-.01em;
+  }
+  .seg button[aria-pressed="true"]{
+    background:var(--raised); color:var(--ink); font-weight:600;
+    box-shadow:var(--shadow-1);
+  }
+
+  .sortbar{display:flex; gap:18px; margin:14px 0 6px}
+  .sortbar button{
+    appearance:none; background:none; border:0; cursor:pointer; padding:6px 0;
+    font-size:13px; font-weight:500; color:var(--ink-3); min-height:34px;
+  }
+  .sortbar button[aria-pressed="true"]{color:var(--ink); font-weight:600}
+
+  /* ---------- progress rail (the signature) ---------- */
+  .rail5{display:inline-flex; gap:2px; align-items:center}
+  .rail5 i{
+    width:11px; height:3px; border-radius:2px; background:var(--line); display:block;
+  }
+  .rail5 i.done{background:var(--ink)}
+  .rail5 i.now{background:var(--accent); width:16px}
+  .rail5 i.now.fin{background:var(--go)}
+
+  /* ---------- job row ---------- */
+  .row{
+    display:block; width:100%; text-align:left; font:inherit; color:inherit;
+    background:transparent; border:0; border-bottom:1px solid var(--line);
+    padding:18px 2px 17px; cursor:pointer;
+  }
+  .row:last-child{border-bottom:0}
+  .row:active{background:var(--inset)}
+  .row-top{display:flex; align-items:center; gap:8px; margin-bottom:5px}
+  .row-top .meta:last-child{margin-left:auto}
+  .row-title{font-size:19px; font-weight:600; letter-spacing:-.02em; line-height:1.25; margin:0 0 3px}
+  .row-sub{font-size:14px; color:var(--ink-2); margin:0; line-height:1.4}
+  .row-foot{display:flex; align-items:center; gap:9px; margin-top:11px}
+  .status{font-size:12.5px; color:var(--ink-2); font-weight:500}
+  .row-extra{margin-left:auto; display:flex; align-items:center; gap:12px}
+  .tally{display:inline-flex; align-items:center; gap:4px; font-family:var(--mono); font-size:11px; color:var(--ink-3)}
+  .tally svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.7}
+  .dist{font-family:var(--mono); font-size:11px; color:var(--ink-3); font-variant-numeric:tabular-nums}
+
+  /* ---------- empty ---------- */
+  .empty{padding:56px 8px; text-align:center}
+  .empty h2{font-size:20px; font-weight:600; letter-spacing:-.02em; margin:0 0 6px}
+  .empty p{margin:0; font-size:14.5px; color:var(--ink-2); max-width:34ch; margin-inline:auto}
+
+  /* ---------- buttons ---------- */
+  .btn{
+    appearance:none; cursor:pointer; text-decoration:none;
+    font-size:16px; font-weight:600; letter-spacing:-.01em;
+    min-height:52px; padding:0 20px; border-radius:var(--r-m);
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    flex:1 1 auto; border:1px solid transparent;
+    background:var(--ink); color:var(--on-ink);
+  }
+  .btn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  .btn:active{opacity:.82}
+  .btn.ghost{background:var(--inset); color:var(--ink)}
+  .btn.small{min-height:42px; font-size:14.5px; padding:0 15px; flex:0 1 auto; border-radius:var(--r-s)}
+  .btn.danger{background:transparent; color:var(--stop); border-color:var(--line)}
+  .btn[aria-disabled="true"]{opacity:.35}
+
+  .bar{
+    position:fixed; left:0; right:0; z-index:45;
+    bottom:calc(58px + env(safe-area-inset-bottom));
+    padding:14px var(--pad) 16px;
+    background:linear-gradient(to top,var(--bg) 58%,var(--bg-0));
+    display:flex; gap:10px; max-width:600px; margin:0 auto;
+  }
+  .bar:empty{display:none}
+
+  .actions{display:flex; flex-wrap:wrap; gap:8px; margin-top:14px}
+
+  /* ---------- tabs ---------- */
+  .tabs{
+    position:fixed; left:0; right:0; bottom:0; z-index:50;
+    background:var(--glass);
+    -webkit-backdrop-filter:saturate(180%) blur(16px);
+    backdrop-filter:saturate(180%) blur(16px);
+    border-top:1px solid var(--line);
+    display:flex; padding-bottom:env(safe-area-inset-bottom);
+  }
+  .tabs button{
+    flex:1 1 0; appearance:none; background:transparent; border:0; cursor:pointer;
+    color:var(--ink-3); padding:8px 4px 7px; min-height:58px;
+    display:grid; place-items:center; gap:3px; font-size:11px; font-weight:500;
+  }
+  .tabs button svg{width:23px;height:23px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .tabs button[aria-current="page"]{color:var(--ink); font-weight:600}
+
+  /* ---------- forms ---------- */
+  .field{margin-bottom:18px}
+  .field input, .field textarea, .field select{
+    width:100%; font-size:16px; line-height:1.4;
+    background:var(--inset); border:1px solid transparent;
+    border-radius:var(--r-m); padding:13px 14px; min-height:var(--tap);
+  }
+  .field textarea{min-height:112px; resize:vertical}
+  .field input::placeholder, .field textarea::placeholder{color:var(--ink-3)}
+  .field input:focus, .field textarea:focus{
+    outline:none; background:var(--raised); border-color:var(--ink);
+    box-shadow:0 0 0 3px var(--focus-ring);
+  }
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+
+  .chips{display:flex; flex-wrap:wrap; gap:7px}
+  .chips button{
+    appearance:none; cursor:pointer; background:var(--inset); border:1px solid transparent;
+    border-radius:999px; font-size:14px; font-weight:500; color:var(--ink-2);
+    padding:9px 15px; min-height:40px; letter-spacing:-.01em;
+  }
+  .chips button[aria-pressed="true"]{background:var(--ink); color:var(--on-ink); font-weight:600}
+
+  /* ---------- detail ---------- */
+  .back{
+    display:inline-flex; align-items:center; gap:4px; margin-left:-6px;
+    background:none; border:0; cursor:pointer; padding:8px 6px;
+    min-height:var(--tap); color:var(--ink-2); font-size:15px; font-weight:500;
+  }
+  .back svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+  .detail-head{margin:6px 0 24px}
+  .detail-head h2{font-size:28px; font-weight:700; letter-spacing:-.03em; line-height:1.12; margin:8px 0 12px}
+  .head-rail{display:flex; align-items:center; gap:10px; margin-bottom:18px}
+
+  dl.facts{margin:0 0 22px; display:grid; grid-template-columns:auto 1fr; gap:11px 20px; align-items:baseline}
+  dl.facts dt{font-size:13px; color:var(--ink-3); font-weight:500}
+  dl.facts dd{margin:0; font-size:15px; overflow-wrap:anywhere}
+  dl.facts dd a{color:var(--ink); text-decoration:none; border-bottom:1px solid var(--line)}
+
+
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(98px,1fr)); gap:7px}
+  .shot{position:relative; aspect-ratio:1; border-radius:var(--r-m); overflow:hidden; background:var(--inset)}
+  .shot img{width:100%; height:100%; object-fit:cover; display:block}
+  .shot .kill{
+    position:absolute; top:5px; right:5px; width:28px; height:28px; border-radius:50%;
+    background:rgba(14,17,22,.62); color:#fff; border:0; cursor:pointer;
+    display:grid; place-items:center; font-size:15px; line-height:1;
+    -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
+  }
+  .add-shot{
+    aspect-ratio:1; border:1px dashed var(--line); border-radius:var(--r-m);
+    background:transparent; cursor:pointer; color:var(--ink-3);
+    display:grid; place-items:center; align-content:center; gap:5px; font-size:12px; font-weight:500;
+  }
+  .add-shot svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+
+  /* ---------- map ---------- */
+  .map-frame{width:100%; aspect-ratio:16/10; border:0; border-radius:var(--r-m); background:var(--inset); display:block}
+  .map-none{
+    background:var(--inset); border-radius:var(--r-m); padding:16px;
+    font-size:14px; line-height:1.5; color:var(--ink-2);
+  }
+  .map-none strong{color:var(--ink); font-weight:600}
+  .pin-read{display:flex; align-items:center; gap:6px; margin:12px 0 0; font-family:var(--mono); font-size:11.5px; color:var(--ink-3)}
+  .pin-read svg{width:13px;height:13px;stroke:var(--ink-2);fill:none;stroke-width:1.8}
+
+  #leaf, #leafMini{width:100%; border-radius:var(--r-m); background:var(--inset); z-index:1}
+  #leaf{height:calc(100vh - 270px); min-height:340px; position:relative; overflow:hidden}
+  #leaf.is-flat{background:var(--inset)}
+  #leafMini{aspect-ratio:16/10}
+  .leaflet-container{font:400 13px/1.4 var(--sans); background:var(--inset)}
+  .leaflet-control-attribution{font-size:10px}
+
+  .mk{
+    width:26px; height:26px; border-radius:50%;
+    background:var(--ink); border:2px solid var(--bg);
+    display:grid; place-items:center;
+    box-shadow:0 2px 6px rgba(14,17,22,.35);
+  }
+  .mk span{font-family:var(--mono); font-weight:600; font-size:11px; color:var(--on-ink); font-variant-numeric:tabular-nums}
+  .mk-done{background:var(--ink-3)}
+  .mk-me{width:16px; height:16px; border-radius:50%; background:var(--blue); border:3px solid var(--bg); box-shadow:0 0 0 3px rgba(27,111,212,.22)}
+
+  .leaflet-popup-content-wrapper{border-radius:var(--r-m); box-shadow:0 6px 24px -8px rgba(14,17,22,.4)}
+  .leaflet-popup-content{margin:13px 15px; width:auto !important; min-width:168px}
+  .pop-no{font-family:var(--mono); font-size:10.5px; color:var(--ink-3)}
+  .pop-title{font-size:17px; font-weight:600; letter-spacing:-.02em; line-height:1.2; margin:3px 0 3px}
+  .pop-sub{font-size:12.5px; color:var(--ink-2); margin:0 0 11px}
+  .pop-acts{display:flex; gap:6px}
+  .pop-acts a, .pop-acts button{
+    appearance:none; cursor:pointer; text-decoration:none; border:0;
+    font-size:13px; font-weight:600; padding:8px 12px; border-radius:8px;
+  }
+  .pop-acts .go{background:var(--ink); color:var(--on-ink)}
+  .pop-acts .op{background:var(--inset); color:var(--ink)}
+
+  .map-legend{display:flex; flex-wrap:wrap; gap:16px; align-items:center; margin:14px 0 0; font-size:12.5px; color:var(--ink-2)}
+  .map-legend i{width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:6px; vertical-align:0}
+
+  .flat{width:100%; height:100%; display:block}
+  .flat-tag{
+    position:absolute; left:12px; top:12px; z-index:2;
+    background:var(--glass); color:var(--ink-2); padding:5px 10px; border-radius:999px;
+    font-size:11.5px; font-weight:500;
+  }
+  .flat-pin{cursor:pointer}
+  .flat-pin text{font-family:var(--mono); font-weight:600; font-size:11px; fill:var(--on-ink); text-anchor:middle; pointer-events:none}
+  .flat-lbl{font-family:var(--sans); font-size:11px; fill:var(--ink-2); text-anchor:middle; pointer-events:none}
+
+  /* ---------- run sheet ---------- */
+  .stop{
+    display:flex; align-items:center; gap:13px; width:100%; text-align:left;
+    font:inherit; color:inherit; background:transparent; cursor:pointer;
+    border:0; border-bottom:1px solid var(--line); padding:15px 2px;
+  }
+  .stop:last-of-type{border-bottom:0}
+  .tick{
+    flex:0 0 auto; width:26px; height:26px; border-radius:50%;
+    border:1.5px solid var(--line); display:grid; place-items:center;
+    color:transparent; font-family:var(--mono); font-size:12px; font-weight:600;
+  }
+  .stop[aria-pressed="true"] .tick{background:var(--ink); border-color:var(--ink); color:var(--on-ink)}
+  .stop-body{flex:1 1 auto; min-width:0}
+  .stop-body strong{display:block; font-size:16px; font-weight:600; letter-spacing:-.015em; line-height:1.25}
+  .stop-body span{display:block; font-size:13px; color:var(--ink-2); margin-top:2px}
+  .stop-dist{flex:0 0 auto; font-family:var(--mono); font-size:11px; color:var(--ink-3)}
+
+  /* ---------- diagnostics ---------- */
+  .chk{list-style:none; margin:0; padding:0; font-size:14px}
+  .chk li{display:flex; gap:12px; align-items:baseline; padding:12px 0; border-bottom:1px solid var(--line)}
+  .chk li:last-child{border-bottom:0}
+  .chk .mark{flex:0 0 auto; width:16px; text-align:center; font-size:13px; font-weight:700}
+  .chk .ok{color:var(--go)} .chk .no{color:var(--stop)} .chk .meh{color:var(--meh)}
+  .chk .what{flex:1 1 auto}
+  .chk .what b{display:block; font-size:14.5px; font-weight:600; letter-spacing:-.01em}
+  .chk .what span{display:block; color:var(--ink-2); font-size:13px; margin-top:1px; overflow-wrap:anywhere}
+  .verdict{background:var(--inset); border-radius:var(--r-m); padding:15px 16px; margin:18px 0 0; font-size:14px; line-height:1.55}
+  .verdict strong{font-weight:600}
+
+  /* ---------- toast ---------- */
+  #toast{
+    position:fixed; left:50%; bottom:118px; transform:translateX(-50%) translateY(6px);
+    background:var(--ink); color:var(--on-ink); padding:12px 18px; border-radius:999px;
+    font-size:14px; font-weight:500; z-index:60; opacity:0; pointer-events:none;
+    transition:opacity .16s ease, transform .16s ease; max-width:88vw; text-align:center;
+    box-shadow:0 8px 24px -8px rgba(14,17,22,.45);
+  }
+  #toast.up{opacity:1; transform:translateX(-50%) translateY(0)}
+
+  /* ---------- confirm dialog ---------- */
+  .ask{
+    position:fixed; inset:0; z-index:70;
+    background:var(--scrim);
+    -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px);
+    display:grid; place-items:center; padding:24px;
+  }
+  .ask[hidden]{display:none}
+  .ask-card{
+    background:var(--bg); border-radius:var(--r-l); padding:24px 22px 20px;
+    width:100%; max-width:360px;
+    box-shadow:0 24px 60px -16px rgba(14,17,22,.5);
+  }
+  .ask-card h3{font-size:19px; font-weight:600; letter-spacing:-.02em; margin:0 0 8px}
+  .ask-card p{margin:0 0 20px; font-size:14.5px; line-height:1.5; color:var(--ink-2)}
+  .ask-acts{display:flex; gap:9px}
+  .ask-acts .btn{flex:1 1 0; min-height:48px}
+  .btn.solid-danger{background:var(--stop-bg); color:var(--on-stop); border-color:transparent}
+
+  /* ---------- timer ---------- */
+  .clock-wrap{display:flex; align-items:center; gap:12px; margin:0 0 6px}
+  .clock{
+    font-family:var(--mono); font-size:40px; font-weight:600;
+    letter-spacing:-.03em; line-height:1; font-variant-numeric:tabular-nums;
+  }
+  .clock.idle{color:var(--ink-3)}
+  .live-dot{
+    width:9px; height:9px; border-radius:50%; background:var(--accent);
+    flex:0 0 auto; animation:blip 1.8s ease-in-out infinite;
+  }
+  @keyframes blip{0%,100%{opacity:1}50%{opacity:.28}}
+  .clock-meta{font-size:13.5px; color:var(--ink-2); margin:0 0 16px}
+  .clock-meta b{font-weight:600; color:var(--ink)}
+  .btn.running{background:var(--accent); color:var(--on-accent)}
+  .warn{
+    background:var(--warn-bg); border-radius:var(--r-m); padding:13px 15px;
+    font-size:13.5px; line-height:1.5; color:var(--warn-fg); margin:0 0 14px;
+  }
+
+  .sess{list-style:none; margin:14px 0 0; padding:0}
+  .sess li{
+    display:flex; align-items:center; gap:10px;
+    padding:11px 0; border-bottom:1px solid var(--line); font-size:14px;
+  }
+  .sess li:last-child{border-bottom:0}
+  .sess .when{flex:1 1 auto; color:var(--ink-2); font-size:13.5px}
+  .sess .len{font-family:var(--mono); font-size:13px; font-variant-numeric:tabular-nums}
+
+  .hdr-timer{
+    display:inline-flex; align-items:center; gap:7px; flex:0 0 auto;
+    background:var(--inset); border:0; cursor:pointer;
+    border-radius:999px; padding:7px 12px 7px 10px; min-height:36px;
+    font-family:var(--mono); font-size:12.5px; font-weight:600; color:var(--ink);
+    font-variant-numeric:tabular-nums;
+  }
+  .hdr-timer[hidden]{display:none}
+
+  .runmark{
+    display:inline-flex; align-items:center; gap:4px;
+    font-family:var(--mono); font-size:11px; color:var(--ink-3);
+    font-variant-numeric:tabular-nums;
+  }
+  .runmark i{width:6px; height:6px; border-radius:50%; background:var(--accent); display:block}
+  .runmark svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:1.8}
+
+  @media (prefers-reduced-motion:reduce){
+    .live-dot{animation:none}
+  }
+
+  /* ---------- dark ----------
+     Not an inversion. Text sits a little under pure white to stop it
+     glaring, surfaces get lighter as they come forward, and the accent
+     colours are lifted so they still read against a dark ground. */
+  :root[data-theme="dark"]{
+    --bg:#0C0E11;
+    --inset:#191D22;
+    --inset-2:#222831;
+    --raised:#2B3138;
+    --line:#262C33;
+    --ink:#E9ECEF;
+    --ink-2:#A0A9B2;
+    --ink-3:#727C86;
+    --accent:#F5B301;
+    --go:#35B37E;
+    --stop:#F2705F;
+    --blue:#5B9BF0;
+    --on-ink:#0C0E11;
+    --on-accent:#0C0E11;
+    --stop-bg:#E5533F;
+    --on-stop:#140705;
+    --glass:rgba(12,14,17,.82);
+    --bg-0:rgba(12,14,17,0);
+    --warn-bg:rgba(245,179,1,.13);
+    --warn-fg:#EFC463;
+    --meh:#D9A93A;
+    --scrim:rgba(0,0,0,.62);
+    --shadow-1:0 1px 3px rgba(0,0,0,.5);
+    --focus-ring:rgba(233,236,239,.14);
+    --tile-filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.9);
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#0C0E11;
+      --inset:#191D22;
+      --inset-2:#222831;
+      --raised:#2B3138;
+      --line:#262C33;
+      --ink:#E9ECEF;
+      --ink-2:#A0A9B2;
+      --ink-3:#727C86;
+      --accent:#F5B301;
+      --go:#35B37E;
+      --stop:#F2705F;
+      --blue:#5B9BF0;
+      --on-ink:#0C0E11;
+      --on-accent:#0C0E11;
+      --stop-bg:#E5533F;
+      --on-stop:#140705;
+      --glass:rgba(12,14,17,.82);
+      --bg-0:rgba(12,14,17,0);
+      --warn-bg:rgba(245,179,1,.13);
+      --warn-fg:#EFC463;
+      --meh:#D9A93A;
+      --scrim:rgba(0,0,0,.62);
+      --shadow-1:0 1px 3px rgba(0,0,0,.5);
+      --focus-ring:rgba(233,236,239,.14);
+      --tile-filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.9);
+    }
+  }
+  /* the map is somebody else's artwork — dim it rather than leave a
+     white rectangle glaring out of a dark screen */
+  .leaflet-tile{filter:var(--tile-filter)}
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip{background:var(--raised); color:var(--ink)}
+  .leaflet-control-attribution{background:var(--glass) !important; color:var(--ink-2)}
+  .leaflet-control-attribution a{color:var(--ink-2)}
+  .leaflet-bar a{background:var(--raised); color:var(--ink); border-bottom-color:var(--line)}
+
+  /* ---------- parts ---------- */
+  .drop{
+    appearance:none; background:none; border:0; cursor:pointer; color:var(--ink-3);
+    width:32px; height:32px; border-radius:50%; display:grid; place-items:center;
+    font-size:16px; line-height:1; flex:0 0 auto; margin-right:-6px;
+  }
+  .drop:active{background:var(--inset)}
+
+  .parts{list-style:none; margin:0; padding:0}
+  .parts li{
+    display:flex; align-items:center; gap:10px;
+    padding:13px 0; border-bottom:1px solid var(--line);
+  }
+  .parts li:last-child{border-bottom:0}
+  .p-body{flex:1 1 auto; min-width:0}
+  .p-name{font-size:15px; line-height:1.3; overflow-wrap:anywhere}
+  .p-qty{
+    font-family:var(--mono); font-size:11.5px; color:var(--ink-3);
+    display:block; margin-top:2px; font-variant-numeric:tabular-nums;
+  }
+  .p-sum{
+    font-family:var(--mono); font-size:14px; font-variant-numeric:tabular-nums;
+    flex:0 0 auto;
+  }
+  .parts-empty{font-size:14px; color:var(--ink-2); margin:0}
+
+  .totals{background:var(--inset); border-radius:var(--r-m); padding:16px 17px; margin-top:20px}
+  .totals .tr{display:flex; align-items:baseline; gap:12px; padding:5px 0; font-size:14.5px}
+  .totals .k{flex:1 1 auto; color:var(--ink-2)}
+  .totals .v{font-family:var(--mono); font-variant-numeric:tabular-nums; color:var(--ink)}
+  .totals .grand{
+    border-top:1px solid var(--line); margin-top:9px; padding-top:13px;
+    font-size:18px; font-weight:600;
+  }
+  .totals .grand .k{color:var(--ink)}
+  .totals .grand .v{font-weight:600}
+  .totals .note{font-size:13px; margin:9px 0 0; color:var(--ink-2)}
+  .totals .over{color:var(--stop)}
+  .totals .under{color:var(--go)}
+
+  /* ---------- notes log ---------- */
+  .notelog{list-style:none; margin:0; padding:0}
+  .notelog li{padding:14px 0; border-bottom:1px solid var(--line)}
+  .notelog li:last-child{border-bottom:0}
+  .note-head{display:flex; align-items:center; gap:8px; margin-bottom:5px}
+  .note-time{
+    font-family:var(--mono); font-size:11px; color:var(--ink-3);
+    flex:1 1 auto; font-variant-numeric:tabular-nums;
+  }
+  .note-share{
+    appearance:none; cursor:pointer; border:1px solid var(--line);
+    background:transparent; color:var(--ink-3);
+    font-size:11.5px; font-weight:600; padding:4px 9px; border-radius:999px;
+    min-height:28px; flex:0 0 auto; letter-spacing:-.01em;
+  }
+  .note-share[aria-pressed="true"]{background:var(--accent); color:var(--on-accent); border-color:transparent}
+  .note-text{
+    font-size:15px; line-height:1.5; white-space:pre-wrap;
+    overflow-wrap:anywhere; cursor:text; margin:0;
+  }
+  .notes-empty{font-size:14px; color:var(--ink-2); margin:0}
+  .editing-flag{font-size:13px; color:var(--ink-2); margin:0 0 8px}
+
+  :focus-visible{outline:2px solid var(--ink); outline-offset:2px}
+  @media (prefers-reduced-motion:reduce){
+    *{transition-duration:.01ms !important; animation-duration:.01ms !important}
+  }
+</style>
+
+<header>
+  <div class="brand" id="bizName">Your business</div>
+  <button class="hdr-timer" id="hdrTimer" hidden aria-label="Go to the running job">
+    <span class="live-dot" aria-hidden="true"></span><span id="hdrTimerText">0:00</span>
+  </button>
+  <button class="icon-btn" id="themeBtn" aria-label="Switch to dark mode">
+    <svg id="themeIcon" viewBox="0 0 24 24"></svg>
+  </button>
+  <button class="icon-btn" id="openSettings" aria-label="Settings">
+    <svg viewBox="0 0 24 24"><path d="M5 21V14M5 10V3M12 21V12M12 8V3M19 21V16M19 12V3M2 14h6M9 8h6M16 16h6"/></svg>
+  </button>
+</header>
+
+<main>
+  <!-- ============ LIST ============ -->
+  <section class="view" id="viewList">
+    <div class="seg" role="group" aria-label="Filter jobs">
+      <button data-filter="open" aria-pressed="true">Open</button>
+      <button data-filter="done" aria-pressed="false">Finished</button>
+      <button data-filter="all" aria-pressed="false">All</button>
+    </div>
+    <div class="sortbar" role="group" aria-label="Sort jobs">
+      <button data-sort="new" aria-pressed="true">Newest first</button>
+      <button data-sort="near" aria-pressed="false">Closest to me</button>
+    </div>
+    <div id="jobList"></div>
+  </section>
+
+  <!-- ============ DETAIL ============ -->
+  <section class="view" id="viewDetail" hidden>
+    <button class="back" data-go="list"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg> All jobs</button>
+
+    <div class="detail-head">
+      <div class="meta" id="dNo"></div>
+      <h2 id="dTitle"></h2>
+      <div class="head-rail"><span class="rail5" id="dRail"></span><span class="status" id="dStatusWord"></span></div>
+      <div class="chips" id="dStatus" role="group" aria-label="Job status"></div>
+    </div>
+
+    <dl class="facts" id="dFacts"></dl>
+    <h3 class="shead">Notes</h3>
+    <ul class="notelog" id="nList"></ul>
+    <p class="notes-empty" id="nEmpty" hidden>No notes yet.</p>
+    <div class="actions" style="margin-top:14px">
+      <button class="btn ghost small" id="nAdd">Add a note</button>
+    </div>
+    <div id="nForm" hidden>
+      <p class="editing-flag" id="nEditing" hidden>Editing an earlier note.</p>
+      <div class="field" style="margin-top:14px">
+        <label class="lbl" for="nText">Note</label>
+        <textarea id="nText" placeholder="Access through the side gate. Dog is friendly."></textarea>
+      </div>
+      <div class="actions" style="margin:0">
+        <button class="btn small" id="nSave">Save note</button>
+        <button class="btn ghost small" id="nCancel">Cancel</button>
+      </div>
+    </div>
+
+    <h3 class="shead">Where</h3>
+    <div id="dMap"></div>
+    <p class="pin-read" id="dPin" hidden>
+      <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      <span id="dPinText"></span>
+    </p>
+    <div class="actions">
+      <a class="btn small" id="dNav" href="#" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>
+        Directions
+      </a>
+      <button class="btn ghost small" id="dGeo" hidden>Find address</button>
+      <button class="btn ghost small" id="dPinDrop">Save pin at this site</button>
+      <button class="btn ghost small" id="dManualToggle">Paste a location</button>
+    </div>
+    <div id="dManual" hidden>
+      <div class="field" style="margin:14px 0 8px">
+        <label class="lbl" for="dLatLng">Coordinates or Google Maps link</label>
+        <input id="dLatLng" placeholder="-37.56224, 143.85030" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="actions" style="margin:0">
+        <button class="btn small" id="dSetLatLng">Set location</button>
+      </div>
+      <p class="hint">In Google Maps, press and hold the spot until a pin drops, then copy the coordinates or use Share → Copy link, and paste it here.</p>
+    </div>
+    <p class="hint" id="dGeoNote" hidden style="color:var(--stop)"></p>
+
+    <h3 class="shead">Time on the job</h3>
+    <p class="warn" id="tWarn" hidden></p>
+    <div class="clock-wrap">
+      <span class="live-dot" id="tDot" hidden aria-hidden="true"></span>
+      <span class="clock" id="tClock">0:00:00</span>
+    </div>
+    <p class="clock-meta" id="tMeta"></p>
+    <div class="actions" style="margin-top:0">
+      <button class="btn" id="tToggle">Start timer</button>
+      <button class="btn ghost small" id="tAdd">Add time</button>
+    </div>
+    <div id="tManual" hidden>
+      <div class="row2" style="margin-top:16px">
+        <div class="field">
+          <label class="lbl" for="tHrs">Hours</label>
+          <input id="tHrs" type="number" min="0" step="1" inputmode="numeric" placeholder="0">
+        </div>
+        <div class="field">
+          <label class="lbl" for="tMins">Minutes</label>
+          <input id="tMins" type="number" min="0" max="59" step="1" inputmode="numeric" placeholder="0">
+        </div>
+      </div>
+      <div class="actions" style="margin:0">
+        <button class="btn small" id="tAddGo">Add to this job</button>
+      </div>
+      <p class="hint">For work you did before you started using the timer, or a session you forgot to run.</p>
+    </div>
+    <ul class="sess" id="tSessions"></ul>
+
+    <h3 class="shead">Parts and materials</h3>
+    <ul class="parts" id="pList"></ul>
+    <p class="parts-empty" id="pEmpty" hidden>Nothing added yet.</p>
+    <div class="actions" style="margin-top:14px">
+      <button class="btn ghost small" id="pAdd">Add a part</button>
+    </div>
+    <div id="pForm" hidden>
+      <div class="field" style="margin-top:16px">
+        <label class="lbl" for="pName">Part</label>
+        <input id="pName" placeholder="Bathroom mixer tap" autocomplete="off">
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label class="lbl" for="pQty">Quantity</label>
+          <input id="pQty" inputmode="decimal" placeholder="1">
+        </div>
+        <div class="field">
+          <label class="lbl" for="pCost">Cost each</label>
+          <input id="pCost" inputmode="decimal" placeholder="$">
+        </div>
+      </div>
+      <div class="actions" style="margin:0">
+        <button class="btn small" id="pAddGo">Add to this job</button>
+      </div>
+    </div>
+
+    <div class="totals" id="dTotals" hidden></div>
+
+    <h3 class="shead">Photos</h3>
+    <div class="grid" id="dPhotos"></div>
+
+    <h3 class="shead">Send it</h3>
+    <div class="actions">
+      <a class="btn" id="dEmail" href="#">
+        <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/></svg>
+        Email customer
+      </a>
+      <button class="btn ghost small" id="dShare">
+        <svg viewBox="0 0 24 24"><path d="M12 16V3m0 0L8 7m4-4 4 4"/><path d="M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/></svg>
+        Share with photos
+      </button>
+      <button class="btn ghost small" id="dCopy">Copy details</button>
+    </div>
+    <p class="hint">The email button fills in the subject and body for you. Photos can't ride along on an email link — use <strong>Share with photos</strong> to send them as attachments.</p>
+
+    <h3 class="shead">Manage</h3>
+    <div class="actions">
+      <button class="btn ghost small" id="dEdit">Edit job</button>
+      <button class="btn danger small" id="dDelete">Delete job</button>
+    </div>
+  </section>
+
+  <!-- ============ FORM ============ -->
+  <section class="view" id="viewForm" hidden>
+    <button class="back" data-go="back"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg> Cancel</button>
+    <h2 class="h1" id="formTitle">New job</h2>
+
+    <div class="field">
+      <label class="lbl" for="fTitle">What's the job</label>
+      <input id="fTitle" placeholder="Replace kitchen mixer tap" autocomplete="off">
+    </div>
+    <div class="field">
+      <label class="lbl" for="fCustomer">Customer</label>
+      <input id="fCustomer" placeholder="Full name" autocomplete="name">
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label class="lbl" for="fPhone">Phone</label>
+        <input id="fPhone" type="tel" placeholder="04.." autocomplete="tel">
+      </div>
+      <div class="field">
+        <label class="lbl" for="fEmail">Email</label>
+        <input id="fEmail" type="email" placeholder="name@email.com" autocomplete="email">
+      </div>
+    </div>
+    <div class="field">
+      <label class="lbl" for="fAddress">Site address</label>
+      <input id="fAddress" placeholder="Street, suburb" autocomplete="street-address">
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label class="lbl" for="fQuote">Quoted price</label>
+        <input id="fQuote" placeholder="$" inputmode="decimal">
+      </div>
+      <div class="field">
+        <label class="lbl" for="fRate">Rate for this job</label>
+        <input id="fRate" placeholder="Leave blank for usual" inputmode="decimal">
+      </div>
+    </div>
+    <div class="field" id="fNotesWrap">
+      <label class="lbl" for="fNotes">First note</label>
+      <textarea id="fNotes" placeholder="Access through the side gate. Needs 32mm flexi hoses."></textarea>
+    </div>
+    <p class="hint" id="fNotesHint" hidden style="margin:-8px 0 18px">Notes are added and edited from the job itself.</p>
+    <div class="field">
+      <span class="lbl">Status</span>
+      <div class="chips" id="fStatus" role="group" aria-label="Job status"></div>
+    </div>
+  </section>
+
+  <!-- ============ MAP ============ -->
+  <section class="view" id="viewMap" hidden>
+    <button class="back" data-go="list"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg> All jobs</button>
+    <h2 class="h1">Job map</h2>
+    <div id="leaf"></div>
+    <div class="map-legend">
+      <span><i style="background:var(--ink)"></i>Open job</span>
+      <span><i style="background:var(--ink-3)"></i>Finished</span>
+      <span><i style="background:var(--blue)"></i>You</span>
+    </div>
+    <p class="hint" id="mapHint"></p>
+  </section>
+
+  <!-- ============ RUN SHEET ============ -->
+  <section class="view" id="viewRun" hidden>
+    <button class="back" data-go="list"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg> All jobs</button>
+    <h2 class="h1">Today's run</h2>
+    <p class="hint" style="margin:0 0 18px">Tick the jobs you're doing, in the order you want them. Google Maps takes up to 10 stops and starts from wherever you are.</p>
+    <div class="actions" style="margin:0 0 18px">
+      <button class="btn ghost small" id="runNear">Order by closest</button>
+      <button class="btn ghost small" id="runClear">Clear all</button>
+    </div>
+    <div id="runList"></div>
+  </section>
+
+  <!-- ============ SETTINGS ============ -->
+  <section class="view" id="viewSettings" hidden>
+    <button class="back" data-go="list"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg> All jobs</button>
+    <h2 class="h1">Your details</h2>
+    <p class="hint" style="margin:0 0 20px">These go at the bottom of every email you send from a job.</p>
+
+    <div class="field">
+      <label class="lbl" for="sName">Business name</label>
+      <input id="sName" placeholder="e.g. Hartley &amp; Sons Handyman">
+    </div>
+    <div class="field">
+      <label class="lbl" for="sTrader">Your name</label>
+      <input id="sTrader" placeholder="Who signs off">
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label class="lbl" for="sPhone">Phone</label>
+        <input id="sPhone" type="tel">
+      </div>
+      <div class="field">
+        <label class="lbl" for="sEmail">Email</label>
+        <input id="sEmail" type="email">
+      </div>
+    </div>
+    <div class="field">
+      <label class="lbl" for="sAbn">ABN</label>
+      <input id="sAbn" placeholder="Shown on quotes">
+    </div>
+
+    <h3 class="shead">Jobs from the office</h3>
+    <p class="hint" style="margin:0 0 14px">Paste the code from the office page, or pick the file they sent you. Jobs you've already brought in are skipped.</p>
+    <div class="field">
+      <label class="lbl" for="impCode">Code from the office</label>
+      <textarea id="impCode" placeholder="HJ1:…" spellcheck="false" autocomplete="off"></textarea>
+    </div>
+    <div class="actions" style="margin:0 0 8px">
+      <button class="btn small" id="impGo">Bring in jobs</button>
+      <button class="btn ghost small" id="impFile">Choose a file</button>
+    </div>
+    <p class="hint" id="impNote" hidden></p>
+
+    <h3 class="shead">Backup</h3>
+    <p class="hint" style="margin:0 0 14px">Everything lives on this phone only. If you lose it or clear your browser, the jobs go with it. Save a copy somewhere now and then.</p>
+    <div class="actions" style="margin:0">
+      <button class="btn ghost small" id="expGo">Download a backup</button>
+      <button class="btn ghost small" id="expRestore">Restore from backup</button>
+    </div>
+    <p class="hint">Photos aren't included in the backup — they'd make the file enormous.</p>
+
+    <h3 class="shead">Appearance</h3>
+    <div class="seg" id="themeSeg" role="group" aria-label="Appearance">
+      <button data-theme="auto" aria-pressed="true">Auto</button>
+      <button data-theme="light" aria-pressed="false">Light</button>
+      <button data-theme="dark" aria-pressed="false">Dark</button>
+    </div>
+    <p class="hint" style="margin:8px 0 0">Auto follows your phone's own light and dark setting. The button in the top bar switches straight between the two.</p>
+
+    <h3 class="shead">Charging</h3>
+    <div class="row2">
+      <div class="field">
+        <label class="lbl" for="sRate">Hourly rate</label>
+        <input id="sRate" inputmode="decimal" placeholder="$ per hour">
+      </div>
+      <div class="field">
+        <label class="lbl" for="sRound">Bill in blocks of</label>
+        <select id="sRound">
+          <option value="0">Exact time</option>
+          <option value="6">6 minutes</option>
+          <option value="15">15 minutes</option>
+          <option value="30">30 minutes</option>
+          <option value="60">1 hour</option>
+        </select>
+      </div>
+    </div>
+    <p class="hint" style="margin:-6px 0 16px">Time is rounded up to the next block when working out the cost.</p>
+    <div class="field">
+      <label class="lbl" for="sMarkup">Markup on parts (%)</label>
+      <input id="sMarkup" inputmode="decimal" placeholder="Leave blank for none">
+    </div>
+    <p class="hint" style="margin:-8px 0 20px">Added on top of what parts cost you. Leave blank to charge parts at cost.</p>
+
+    <h3 class="shead">Maps</h3>
+    <p class="hint" style="margin:0 0 14px">The map already works without this. Only add a Google Maps Embed API key if you'd rather see Google's map on each job than the free OpenStreetMap one.</p>
+    <div class="field">
+      <label class="lbl" for="sMapKey">Maps embed key</label>
+      <input id="sMapKey" placeholder="AIza…" autocomplete="off" spellcheck="false">
+    </div>
+
+    <h3 class="shead">Check what's working</h3>
+    <p class="hint" style="margin:0 0 14px">Tests what this app can reach from where it's running. Worth doing when something won't load.</p>
+    <div class="actions" style="margin:0 0 14px">
+      <button class="btn ghost small" id="runCheck">Run check</button>
+      <button class="btn ghost small" id="copyCheck" hidden>Copy report</button>
+    </div>
+    <div id="checkOut"></div>
+  </section>
+</main>
+
+<div class="bar" id="bar"></div>
+<nav class="tabs" id="tabs" aria-label="Sections">
+  <button data-tab="viewList" aria-current="page">
+    <svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>Jobs
+  </button>
+  <button data-tab="viewMap">
+    <svg viewBox="0 0 24 24"><path d="M9 3 3 6v15l6-3 6 3 6-3V3l-6 3z"/><path d="M9 3v15M15 6v15"/></svg>Map
+  </button>
+  <button data-tab="viewRun">
+    <svg viewBox="0 0 24 24"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>Run
+  </button>
+</nav>
+<div id="toast" role="status" aria-live="polite"></div>
+<div class="ask" id="ask" hidden role="dialog" aria-modal="true" aria-labelledby="askTitle">
+  <div class="ask-card">
+    <h3 id="askTitle"></h3>
+    <p id="askBody"></p>
+    <div class="ask-acts">
+      <button class="btn ghost" id="askNo">Cancel</button>
+      <button class="btn" id="askYes">Confirm</button>
+    </div>
+  </div>
+</div>
+<input type="file" id="camIn" accept="image/*" capture="environment" multiple hidden>
+<input type="file" id="impIn" accept=".json,application/json,text/plain" hidden>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------- storage (works in Claude artifacts, falls back to memory) ------------- */
+  var mem = {};
+  var store = {
+    async get(k){
+      try{ if(window.storage){ var r = await window.storage.get(k,false); return r ? JSON.parse(r.value) : null; } }
+      catch(e){ /* missing key throws — treat as empty */ }
+      return (k in mem) ? mem[k] : null;
+    },
+    async set(k,v){
+      mem[k]=v;
+      try{ if(window.storage){ await window.storage.set(k, JSON.stringify(v), false); } }catch(e){}
+    },
+    async del(k){
+      delete mem[k];
+      try{ if(window.storage){ await window.storage.delete(k,false); } }catch(e){}
+    }
+  };
+
+  var K_JOBS='hj:jobs', K_SET='hj:settings', K_PHOTOS=function(id){return 'hj:photos:'+id;};
+
+  var STATUSES=[
+    {id:'quoted',   label:'Quoted',   open:true},
+    {id:'booked',   label:'Booked in',   open:true},
+    {id:'progress', label:'On the tools', open:true},
+    {id:'done',     label:'Finished',     open:false},
+    {id:'invoiced', label:'Invoiced', open:false}
+  ];
+  function statusOf(id){ return STATUSES.filter(function(s){return s.id===id;})[0] || STATUSES[0]; }
+
+  var jobs=[], settings={}, filter='open', sortBy='new', current=null, editingId=null, photoCache={};
+  var myPos=null, runPicks=[];
+  var $ = function(id){ return document.getElementById(id); };
+
+  /* ---------------- location helpers ---------------- */
+  function here(fresh){
+    return new Promise(function(res,rej){
+      if(!navigator.geolocation) return rej(new Error('unsupported'));
+      navigator.geolocation.getCurrentPosition(
+        function(p){ res({lat:p.coords.latitude, lng:p.coords.longitude, acc:Math.round(p.coords.accuracy)}); },
+        rej,
+        {enableHighAccuracy:true, timeout:15000, maximumAge: fresh?0:60000}
+      );
+    });
+  }
+  function geoExcuse(e){
+    if(e && e.code===1) return 'Location is blocked — allow it for this site in your browser settings';
+    if(e && e.code===3) return 'Took too long to get a fix. Try again outside';
+    return "Couldn't get your location on this device";
+  }
+  function kmBetween(a,b){
+    var R=6371, dLat=(b.lat-a.lat)*Math.PI/180, dLng=(b.lng-a.lng)*Math.PI/180;
+    var la1=a.lat*Math.PI/180, la2=b.lat*Math.PI/180;
+    var x=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.sin(dLng/2)*Math.sin(dLng/2)*Math.cos(la1)*Math.cos(la2);
+    return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+  }
+  function niceKm(km){ return km<1 ? Math.round(km*1000)+' m' : km.toFixed(km<10?1:0)+' km'; }
+
+  // what we hand Google for this job: a saved pin beats a typed address
+  function target(j){
+    if(j.lat!=null && j.lng!=null) return j.lat.toFixed(6)+','+j.lng.toFixed(6);
+    return j.address || '';
+  }
+  function navUrl(j){
+    var t=target(j);
+    if(!t) return '';
+    return 'https://www.google.com/maps/dir/?api=1&travelmode=driving&destination='+encodeURIComponent(t);
+  }
+  function routeUrl(list){
+    var stops=list.map(target).filter(Boolean);
+    if(!stops.length) return '';
+    var dest=stops[stops.length-1], mid=stops.slice(0,-1).slice(0,9);
+    var u='https://www.google.com/maps/dir/?api=1&travelmode=driving&destination='+encodeURIComponent(dest);
+    if(mid.length) u+='&waypoints='+mid.map(encodeURIComponent).join('%7C');
+    return u;
+  }
+  function embedUrl(j){
+    if(!settings.mapkey) return '';
+    var t=target(j);
+    if(!t) return '';
+    return 'https://www.google.com/maps/embed/v1/place?key='+encodeURIComponent(settings.mapkey)+
+           '&q='+encodeURIComponent(t)+'&zoom=17';
+  }
+
+  function toast(msg){
+    var t=$('toast'); t.textContent=msg; t.classList.add('up');
+    clearTimeout(t._t); t._t=setTimeout(function(){ t.classList.remove('up'); },2200);
+  }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+  /* Our own confirm. window.confirm is silently suppressed in sandboxed
+     frames — it just returns false — so anything gated behind it never runs. */
+  var askDone=null;
+  function ask(title, body, yesLabel, danger){
+    return new Promise(function(resolve){
+      $('askTitle').textContent=title;
+      $('askBody').textContent=body;
+      $('askYes').textContent=yesLabel||'Confirm';
+      $('askYes').className='btn'+(danger?' solid-danger':'');
+      $('ask').hidden=false;
+      askDone=resolve;
+      setTimeout(function(){ $('askNo').focus(); },30);
+    });
+  }
+  function closeAsk(answer){
+    $('ask').hidden=true;
+    var f=askDone; askDone=null;
+    if(f) f(answer);
+  }
+  $('askYes').onclick=function(){ closeAsk(true); };
+  $('askNo').onclick=function(){ closeAsk(false); };
+  $('ask').onclick=function(e){ if(e.target===$('ask')) closeAsk(false); };
+  document.addEventListener('keydown', function(e){
+    if(e.key==='Escape' && !$('ask').hidden) closeAsk(false);
+  });
+  function pad(n){ return String(n).padStart(4,'0'); }
+  function shortDate(iso){
+    var d=new Date(iso);
+    return d.toLocaleDateString(undefined,{day:'2-digit',month:'short'}).toUpperCase();
+  }
+
+  /* ---------------- views ---------------- */
+  var VIEWS=['viewList','viewDetail','viewForm','viewSettings','viewRun','viewMap'];
+  var lastView='viewList';
+  function show(v){
+    if(v!=='viewForm') lastView = (v==='viewDetail') ? 'viewDetail' : 'viewList';
+    VIEWS.forEach(function(id){ $(id).hidden = (id!==v); });
+    var chrome = (v!=='viewForm' && v!=='viewSettings');
+    $('tabs').style.display = chrome ? '' : 'none';
+    document.body.style.paddingBottom = chrome
+      ? 'calc(150px + env(safe-area-inset-bottom))'
+      : 'calc(92px + env(safe-area-inset-bottom))';
+    $('bar').style.bottom = chrome
+      ? 'calc(58px + env(safe-area-inset-bottom))'
+      : 'env(safe-area-inset-bottom)';
+    Array.prototype.forEach.call($('tabs').querySelectorAll('button'), function(b){
+      var on = b.getAttribute('data-tab')===v || (v==='viewDetail' && b.getAttribute('data-tab')==='viewList');
+      if(on) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
+    });
+    window.scrollTo(0,0);
+    renderBar(v);
+  }
+
+  function renderBar(v){
+    var bar=$('bar');
+    if(v==='viewList'){
+      bar.innerHTML='<button class="btn ghost" id="barRun"><svg viewBox="0 0 24 24"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>Run</button>'+
+                    '<button class="btn" id="barNew"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New job</button>';
+      $('barNew').onclick=function(){ openForm(null); };
+      $('barRun').onclick=openRun;
+    } else if(v==='viewDetail'){
+      bar.innerHTML='<button class="btn" id="barPhoto"><svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Take photo</button>';
+      $('barPhoto').onclick=takePhoto;
+    } else if(v==='viewForm'){
+      bar.innerHTML='<button class="btn ghost" id="barCancel">Cancel</button><button class="btn" id="barSave">Save job</button>';
+      $('barCancel').onclick=function(){ show(lastView); };
+      $('barSave').onclick=saveForm;
+    } else if(v==='viewRun'){
+      bar.innerHTML='<a class="btn" id="barRoute" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>Open route</a>';
+      $('barRoute').onclick=function(e){
+        if(!runPicks.length){ e.preventDefault(); toast('Tick at least one job first'); }
+      };
+      syncRoute();
+    } else if(v==='viewMap'){
+      bar.innerHTML='<button class="btn ghost" id="barMe"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>Find me</button>'+
+                    '<button class="btn" id="barLocate">Locate addresses</button>';
+      $('barLocate').onclick=locateAll;
+      $('barMe').onclick=async function(){
+        var b=this; b.disabled=true; toast('Getting a fix…');
+        try{ myPos = await here(true); drawMap(); if(lmap) lmap.setView([myPos.lat,myPos.lng],15); }
+        catch(e){ toast(geoExcuse(e)); }
+        b.disabled=false;
+      };
+    } else {
+      bar.innerHTML='<button class="btn" id="barSaveSet">Save details</button>';
+      $('barSaveSet').onclick=saveSettings;
+    }
+  }
+
+  /* ---------------- list ---------------- */
+  function visible(){
+    var list = jobs.filter(function(j){
+      if(filter==='all') return true;
+      var o=statusOf(j.status).open;
+      return filter==='open' ? o : !o;
+    });
+    if(sortBy==='near' && myPos){
+      list = list.slice().sort(function(a,b){
+        var da = (a.lat!=null) ? kmBetween(myPos,a) : Infinity;
+        var db = (b.lat!=null) ? kmBetween(myPos,b) : Infinity;
+        return da-db;
+      });
+    }
+    return list;
+  }
+
+  /* A job moves through five stages in order, so show it as a rail:
+     stages behind you in ink, the one you're on in amber, the rest faint. */
+  function statusIndex(id){
+    for(var i=0;i<STATUSES.length;i++){ if(STATUSES[i].id===id) return i; }
+    return 0;
+  }
+  function railHtml(j){
+    var at=statusIndex(j.status), fin=!statusOf(j.status).open, out='';
+    for(var i=0;i<STATUSES.length;i++){
+      out += '<i class="'+(i<at ? 'done' : i===at ? ('now'+(fin?' fin':'')) : '')+'"></i>';
+    }
+    return '<span class="rail5">'+out+'</span>';
+  }
+
+  var CAM_SVG='<svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
+
+  function renderList(){
+    var wrap=$('jobList'), list=visible();
+    if(!list.length){
+      wrap.innerHTML='<div class="empty">'+
+        '<h2>'+(jobs.length?'Nothing in this filter':'No jobs yet')+'</h2>'+
+        '<p>'+(jobs.length?'Try Finished or All.':'Add your first job, snap a few photos, email it across.')+'</p></div>';
+      return;
+    }
+    wrap.innerHTML = list.map(function(j){
+      var dist = (myPos && j.lat!=null) ? niceKm(kmBetween(myPos,j)) : '';
+      var sec = jobSeconds(j), live = isRunning(j);
+      var time = live
+        ? '<span class="runmark"><i></i>'+fmtClock(sec)+'</span>'
+        : (sec>0 ? '<span class="runmark"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg>'+fmtDur(sec)+'</span>' : '');
+      return '<button class="row" data-id="'+j.id+'">'+
+        '<div class="row-top"><span class="meta">#'+pad(j.num)+'</span>'+
+        '<span class="meta">'+shortDate(j.created)+'</span></div>'+
+        '<h3 class="row-title">'+esc(j.title||'Untitled job')+'</h3>'+
+        '<p class="row-sub">'+esc([j.customer,j.address].filter(Boolean).join(' · ')||'No customer yet')+'</p>'+
+        '<div class="row-foot">'+railHtml(j)+
+        '<span class="status">'+statusOf(j.status).label+'</span>'+
+        '<span class="row-extra">'+
+          time+
+          (dist?'<span class="dist">'+dist+'</span>':'')+
+          (j.photoCount?'<span class="tally">'+CAM_SVG+j.photoCount+'</span>':'')+
+        '</span></div></button>';
+    }).join('');
+    Array.prototype.forEach.call(wrap.querySelectorAll('.row'), function(el){
+      el.onclick=function(){ openDetail(el.getAttribute('data-id')); };
+    });
+  }
+
+  /* ---------------- detail ---------------- */
+  async function openDetail(id){
+    current = jobs.filter(function(j){return j.id===id;})[0];
+    if(!current) return;
+    var j=current;
+    $('dNo').textContent='#'+pad(j.num)+'  ·  '+shortDate(j.created);
+    $('dTitle').textContent=j.title||'Untitled job';
+    $('dRail').outerHTML=railHtml(j).replace('class="rail5"','class="rail5" id="dRail"');
+    $('dStatusWord').textContent=statusOf(j.status).label;
+
+    $('dStatus').innerHTML=STATUSES.map(function(s){
+      return '<button data-s="'+s.id+'" aria-pressed="'+(s.id===j.status)+'">'+s.label+'</button>';
+    }).join('');
+    Array.prototype.forEach.call($('dStatus').querySelectorAll('button'), function(b){
+      b.onclick=async function(){
+        j.status=b.getAttribute('data-s');
+        await store.set(K_JOBS,jobs);
+        openDetail(j.id); renderList(); toast('Marked '+statusOf(j.status).label.toLowerCase());
+      };
+    });
+
+    var f=[];
+    if(j.customer) f.push(['Customer', esc(j.customer)]);
+    if(j.phone)    f.push(['Phone', '<a href="tel:'+esc(j.phone.replace(/\s/g,''))+'">'+esc(j.phone)+'</a>']);
+    if(j.email)    f.push(['Email', '<a href="mailto:'+esc(j.email)+'">'+esc(j.email)+'</a>']);
+    if(j.address)  f.push(['Site', '<a href="https://maps.google.com/?q='+encodeURIComponent(j.address)+'" target="_blank" rel="noopener">'+esc(j.address)+'</a>']);
+    if(j.quote)    f.push(['Quoted', esc(j.quote)]);
+    $('dFacts').innerHTML = f.map(function(r){ return '<dt>'+r[0]+'</dt><dd>'+r[1]+'</dd>'; }).join('');
+
+    renderNotes(j);
+    closeNoteForm();
+
+    renderMap(j);
+    renderTimer(j);
+    renderParts(j);
+    $('tManual').hidden=true;
+    $('pForm').hidden=true;
+    $('dEmail').href = mailtoFor(j);
+    await renderPhotos(j.id);
+    show('viewDetail');
+  }
+
+  function renderMap(j){
+    var em=embedUrl(j), box=$('dMap');
+    if(em){
+      if(lmini){ lmini.remove(); lmini=null; }
+      box.innerHTML='<iframe class="map-frame" src="'+esc(em)+'" loading="lazy" '+
+        'referrerpolicy="no-referrer-when-downgrade" allowfullscreen title="Map of the job site"></iframe>';
+    } else if(j.lat!=null){
+      if(!drawMini(j)){
+        box.innerHTML='<div class="map-none">Pinned at '+j.lat.toFixed(5)+', '+j.lng.toFixed(5)+
+          '. The street map couldn\u2019t load here — <strong>Directions</strong> still works.</div>';
+      }
+    } else if(j.address){
+      if(lmini){ lmini.remove(); lmini=null; }
+      box.innerHTML='<div class="map-none">This address isn\u2019t on the map yet. Tap <strong>Find address</strong> to place it.</div>';
+    } else {
+      if(lmini){ lmini.remove(); lmini=null; }
+      box.innerHTML='<div class="map-none">No address or pin on this job yet. Add the address, or stand at the site and tap <strong>Save pin</strong>.</div>';
+    }
+
+    $('dGeo').hidden = !(j.address && j.lat==null);
+    $('dManual').hidden = true;
+    $('dGeoNote').hidden = true;
+    $('dLatLng').value = '';
+    $('dManualToggle').textContent = (j.lat!=null) ? 'Edit location' : 'Paste a location';
+
+    var url=navUrl(j);
+    var nav=$('dNav');
+    if(url){ nav.href=url; nav.removeAttribute('aria-disabled'); nav.style.opacity=''; }
+    else { nav.href='#'; nav.setAttribute('aria-disabled','true'); nav.style.opacity='.4'; }
+
+    if(j.lat!=null){
+      $('dPin').hidden=false;
+      $('dPinText').textContent = j.lat.toFixed(5)+', '+j.lng.toFixed(5)+
+        (j.fromAddress ? '  · from the address'
+                       : '  · GPS pin' + (j.acc?' ±'+j.acc+'m':''));
+      $('dPinDrop').textContent='Update pin';
+    } else {
+      $('dPin').hidden=true;
+      $('dPinDrop').textContent='Save pin at this site';
+    }
+  }
+
+  $('dManualToggle').onclick = function(){
+    var box=$('dManual');
+    box.hidden = !box.hidden;
+    if(!box.hidden){
+      if(current && current.lat!=null) $('dLatLng').value = current.lat.toFixed(5)+', '+current.lng.toFixed(5);
+      $('dLatLng').focus();
+    }
+  };
+
+  $('dSetLatLng').onclick = async function(){
+    if(!current) return;
+    var p = parseLatLng($('dLatLng').value);
+    if(!p){ toast('Need two numbers like -37.56224, 143.85030 — or a Google Maps link'); return; }
+    current.lat=p.lat; current.lng=p.lng; current.acc=null; current.fromAddress=false;
+    await store.set(K_JOBS,jobs);
+    $('dManual').hidden=true; $('dGeoNote').hidden=true;
+    renderMap(current); renderList();
+    toast('Location set');
+  };
+
+  $('dGeo').onclick = async function(){
+    if(!current || !current.address) return;
+    var btn=this; btn.disabled=true;
+    $('dGeoNote').hidden=true;
+    toast('Looking up the address…');
+    try{
+      var r = await geocode(current.address);
+      current.lat=r.lat; current.lng=r.lng; current.acc=null; current.fromAddress=true;
+      await store.set(K_JOBS,jobs);
+      renderMap(current); renderList();
+      toast('Placed on the map via '+r.via);
+    }catch(e){
+      $('dGeoNote').hidden=false;
+      $('dGeoNote').textContent = 'Lookup failed — '+(e.detail||'no response')+
+        '. Paste a location instead; that works with no internet.';
+      $('dManual').hidden=false;
+      toast('Address lookup unavailable');
+    }
+    btn.disabled=false;
+  };
+
+  $('dPinDrop').onclick = async function(){
+    if(!current) return;
+    var btn=this; btn.disabled=true; toast('Getting a fix…');
+    try{
+      var p = await here(true);
+      current.lat=p.lat; current.lng=p.lng; current.acc=p.acc; current.fromAddress=false;
+      myPos=p;
+      await store.set(K_JOBS,jobs);
+      renderMap(current); renderList();
+      toast('Pin saved (±'+p.acc+'m)');
+    }catch(e){ toast(geoExcuse(e)); }
+    btn.disabled=false;
+  };
+
+  function bodyFor(j){
+    var L=[];
+    L.push('Hi'+(j.customer?' '+j.customer.split(' ')[0]:'')+',');
+    L.push('');
+    L.push('Job: '+(j.title||'Untitled job')+'  (ref #'+pad(j.num)+')');
+    if(j.address) L.push('Site: '+j.address);
+    if(j.quote)   L.push('Quoted: '+j.quote);
+    L.push('Status: '+statusOf(j.status).label);
+    var sec=jobSeconds(j);
+    if(sec>0){
+      var billed=billedSeconds(j), cost=labourCost(j), r=rateFor(j);
+      L.push('Time on the job: '+fmtDur(billed));
+      if(cost!=null) L.push('Labour: '+money(cost)+' ('+fmtDur(billed)+' at '+money(r)+'/hr)');
+    }
+    var ps=partsOf(j);
+    if(ps.length){
+      L.push('');
+      L.push('Parts and materials:');
+      ps.forEach(function(p){
+        L.push('  '+p.n+' — '+num(p.q)+' x '+money(num(p.c))+' = '+money(num(p.q)*num(p.c)));
+      });
+      L.push('  Parts total: '+money(partsCharge(j)));
+    }
+    if(sec>0 || ps.length){
+      L.push('');
+      L.push('TOTAL: '+money(jobTotal(j)));
+    }
+    var shared=logOf(j).filter(function(n){ return n.s && n.x; });
+    if(shared.length){
+      L.push('');
+      shared.forEach(function(n){ L.push(n.x); });
+    }
+    L.push('');
+    L.push('Thanks,');
+    if(settings.trader) L.push(settings.trader);
+    if(settings.name)   L.push(settings.name);
+    if(settings.phone)  L.push(settings.phone);
+    if(settings.email)  L.push(settings.email);
+    if(settings.abn)    L.push('ABN '+settings.abn);
+    return L.join('\n');
+  }
+  function subjectFor(j){
+    return (settings.name? settings.name+' — ':'') + (j.title||'Your job') + ' (#'+pad(j.num)+')';
+  }
+  function mailtoFor(j){
+    return 'mailto:'+encodeURIComponent(j.email||'')+
+      '?subject='+encodeURIComponent(subjectFor(j))+
+      '&body='+encodeURIComponent(bodyFor(j));
+  }
+
+  /* ---------------- photos ---------------- */
+  async function getPhotos(id){
+    if(photoCache[id]) return photoCache[id];
+    var p = await store.get(K_PHOTOS(id));
+    photoCache[id] = p||[];
+    return photoCache[id];
+  }
+
+  async function renderPhotos(id){
+    var shots = await getPhotos(id);
+    var html = shots.map(function(src,i){
+      return '<div class="shot"><img src="'+src+'" alt="Job photo '+(i+1)+'">'+
+             '<button class="kill" data-i="'+i+'" aria-label="Remove photo '+(i+1)+'">&times;</button></div>';
+    }).join('');
+    html += '<button class="add-shot" id="addShot"><svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Add</button>';
+    $('dPhotos').innerHTML = html;
+    $('addShot').onclick = takePhoto;
+    Array.prototype.forEach.call($('dPhotos').querySelectorAll('.kill'), function(b){
+      b.onclick = async function(ev){
+        ev.stopPropagation();
+        var i=+b.getAttribute('data-i');
+        var arr = await getPhotos(id);
+        arr.splice(i,1);
+        photoCache[id]=arr;
+        await store.set(K_PHOTOS(id),arr);
+        current.photoCount=arr.length;
+        await store.set(K_JOBS,jobs);
+        renderPhotos(id); renderList(); toast('Photo removed');
+      };
+    });
+  }
+
+  function takePhoto(){
+    if(!current) return;
+    var input=$('camIn');
+    input.value='';
+    input.click();
+  }
+
+  $('camIn').onchange = async function(){
+    var files = Array.prototype.slice.call(this.files||[]);
+    if(!files.length || !current) return;
+    toast(files.length>1 ? 'Adding '+files.length+' photos…' : 'Adding photo…');
+    var arr = await getPhotos(current.id);
+    for(var i=0;i<files.length;i++){
+      try{ arr.push(await shrink(files[i])); }catch(e){ toast("Couldn't read that image"); }
+    }
+    photoCache[current.id]=arr;
+    await store.set(K_PHOTOS(current.id),arr);
+    current.photoCount=arr.length;
+    await store.set(K_JOBS,jobs);
+    renderPhotos(current.id); renderList();
+    toast(arr.length+' photo'+(arr.length===1?'':'s')+' on this job');
+  };
+
+  // downscale so a phone photo doesn't eat all the storage
+  function shrink(file){
+    return new Promise(function(res,rej){
+      var fr=new FileReader();
+      fr.onerror=function(){ rej(new Error('read')); };
+      fr.onload=function(){
+        var img=new Image();
+        img.onerror=function(){ rej(new Error('decode')); };
+        img.onload=function(){
+          var max=1400, w=img.width, h=img.height;
+          if(w>max||h>max){ var r=Math.min(max/w,max/h); w=Math.round(w*r); h=Math.round(h*r); }
+          var c=document.createElement('canvas'); c.width=w; c.height=h;
+          c.getContext('2d').drawImage(img,0,0,w,h);
+          res(c.toDataURL('image/jpeg',0.72));
+        };
+        img.src=fr.result;
+      };
+      fr.readAsDataURL(file);
+    });
+  }
+
+  function dataURLtoFile(src,name){
+    var parts=src.split(','), mime=parts[0].match(/:(.*?);/)[1];
+    var bin=atob(parts[1]), n=bin.length, u8=new Uint8Array(n);
+    while(n--) u8[n]=bin.charCodeAt(n);
+    return new File([u8],name,{type:mime});
+  }
+
+  $('dShare').onclick = async function(){
+    if(!current) return;
+    var shots = await getPhotos(current.id);
+    var data = { title: subjectFor(current), text: bodyFor(current) };
+    try{
+      if(shots.length && navigator.canShare){
+        var files = shots.map(function(s,i){ return dataURLtoFile(s,'job-'+pad(current.num)+'-'+(i+1)+'.jpg'); });
+        if(navigator.canShare({files:files})) data.files=files;
+      }
+      if(navigator.share){ await navigator.share(data); }
+      else { throw new Error('unsupported'); }
+    }catch(e){
+      if(e && e.name==='AbortError') return;
+      copyDetails();
+    }
+  };
+
+  function copyDetails(){
+    if(!current) return;
+    var txt = subjectFor(current)+'\n\n'+bodyFor(current);
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(txt).then(function(){ toast('Job details copied'); },
+        function(){ fallbackCopy(txt); });
+    } else { fallbackCopy(txt); }
+  }
+  function fallbackCopy(txt){
+    var ta=document.createElement('textarea');
+    ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); toast('Job details copied'); }
+    catch(e){ toast("Couldn't copy — select the text manually"); }
+    document.body.removeChild(ta);
+  }
+  $('dCopy').onclick = copyDetails;
+
+  $('dEdit').onclick = function(){ openForm(current); };
+  $('dDelete').onclick = async function(){
+    if(!current) return;
+    var j=current;
+    var yes = await ask(
+      'Delete job #'+pad(j.num)+'?',
+      (j.title||'This job')+' and its photos will be removed. This can\u2019t be undone.',
+      'Delete', true);
+    if(!yes) return;
+
+    var id=j.id;
+    jobs = jobs.filter(function(x){ return x.id!==id; });
+    delete photoCache[id];
+    current=null;
+    // update the screen first, then persist — a storage hiccup shouldn't
+    // leave a deleted job sitting there looking undeleted
+    renderList();
+    show('viewList');
+    paintTime();
+    toast('Job #'+pad(j.num)+' deleted');
+    await store.del(K_PHOTOS(id));
+    await store.set(K_JOBS,jobs);
+  };
+
+  /* ---------------- form ---------------- */
+  var formStatus='quoted';
+  function openForm(job){
+    editingId = job? job.id : null;
+    $('formTitle').textContent = job? ('Job #'+pad(job.num)) : 'New job';
+    $('fTitle').value    = job? (job.title||'')    : '';
+    $('fCustomer').value = job? (job.customer||'') : '';
+    $('fPhone').value    = job? (job.phone||'')    : '';
+    $('fEmail').value    = job? (job.email||'')    : '';
+    $('fAddress').value  = job? (job.address||'')  : '';
+    $('fQuote').value    = job? (job.quote||'')    : '';
+    $('fRate').value     = job? (job.rate||'')     : '';
+    $('fNotes').value    = '';
+    $('fNotesWrap').hidden = !!job;
+    $('fNotesHint').hidden = !job;
+    formStatus = job? job.status : 'quoted';
+    paintFormStatus();
+    show('viewForm');
+    setTimeout(function(){ $('fTitle').focus(); },60);
+  }
+  function paintFormStatus(){
+    $('fStatus').innerHTML = STATUSES.map(function(s){
+      return '<button type="button" data-s="'+s.id+'" aria-pressed="'+(s.id===formStatus)+'">'+s.label+'</button>';
+    }).join('');
+    Array.prototype.forEach.call($('fStatus').querySelectorAll('button'), function(b){
+      b.onclick=function(){ formStatus=b.getAttribute('data-s'); paintFormStatus(); };
+    });
+  }
+
+  async function saveForm(){
+    var title=$('fTitle').value.trim();
+    if(!title){ $('fTitle').focus(); toast('Give the job a name first'); return; }
+    var payload={
+      title:title,
+      customer:$('fCustomer').value.trim(),
+      phone:$('fPhone').value.trim(),
+      email:$('fEmail').value.trim(),
+      address:$('fAddress').value.trim(),
+      quote:$('fQuote').value.trim(),
+      rate:$('fRate').value.trim(),
+      status:formStatus
+    };
+    if(editingId){
+      var j=jobs.filter(function(x){return x.id===editingId;})[0];
+      Object.keys(payload).forEach(function(k){ j[k]=payload[k]; });
+      await store.set(K_JOBS,jobs);
+      toast('Job updated');
+      openDetail(j.id);
+    } else {
+      var maxNum = jobs.reduce(function(m,x){ return Math.max(m,x.num||0); },0);
+      payload.id = 'j'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+      payload.num = maxNum+1;
+      payload.created = new Date().toISOString();
+      payload.photoCount = 0;
+      var first=$('fNotes').value.trim();
+      payload.log = first ? [{t:Date.now(), x:first, s:false}] : [];
+      jobs.unshift(payload);
+      await store.set(K_JOBS,jobs);
+      renderList();
+      toast('Job #'+pad(payload.num)+' saved');
+      openDetail(payload.id);
+    }
+  }
+
+  /* ---------------- live map (Leaflet + OpenStreetMap, no key needed) ---------------- */
+  var lmap=null, lmini=null, layer=null, meMark=null, lastGeo=0;
+
+  function leafletReady(){ return typeof L!=='undefined' && L && L.map; }
+
+  function pinIcon(j){
+    var open=statusOf(j.status).open;
+    return L.divIcon({
+      className:'', iconSize:[30,30], iconAnchor:[15,30], popupAnchor:[0,-28],
+      html:'<div class="mk'+(open?'':' mk-done')+'"><span>'+pad(j.num).replace(/^0+(?=\d)/,'')+'</span></div>'
+    });
+  }
+
+  function popupHtml(j){
+    var u=navUrl(j);
+    return '<div class="pop-no">JOB #'+pad(j.num)+'</div>'+
+      '<div class="pop-title">'+esc(j.title||'Untitled job')+'</div>'+
+      '<p class="pop-sub">'+esc([j.customer,j.address].filter(Boolean).join(' · ')||'No address')+'</p>'+
+      '<div class="pop-acts">'+
+        (u?'<a class="go" href="'+esc(u)+'" target="_blank" rel="noopener">Directions</a>':'')+
+        '<button class="op" data-open="'+j.id+'">Open job</button>'+
+      '</div>';
+  }
+
+  function openMapView(){
+    show('viewMap');
+    if(!leafletReady()){ flatMap('Street tiles unavailable'); return; }
+    setTimeout(drawMap,60); // let the container get its height first
+  }
+
+  /* If the street map can't load — no internet, blocked tiles, sandboxed frame —
+     draw the jobs ourselves. Needs nothing from outside. */
+  function flatMap(reason){
+    var host=$('leaf');
+    if(lmap){ try{ lmap.remove(); }catch(e){} lmap=null; layer=null; meMark=null; }
+    host.classList.add('is-flat');
+
+    var pins = jobs.filter(function(j){ return j.lat!=null; });
+    var pts = pins.map(function(j){ return {lat:j.lat, lng:j.lng, job:j}; });
+    if(myPos) pts.push({lat:myPos.lat, lng:myPos.lng, me:true});
+
+    if(!pts.length){
+      host.innerHTML='<div class="flat-tag">'+esc(reason)+'</div>'+
+        '<div class="map-none" style="margin:52px 16px 16px;border:0;background:none">'+
+        'Nothing to plot yet. Add an address to a job and tap <strong>Locate addresses</strong>, '+
+        'or open a job and tap <strong>Save pin at this site</strong>.</div>';
+      $('mapHint').textContent='';
+      return;
+    }
+
+    var lats=pts.map(function(p){return p.lat;}), lngs=pts.map(function(p){return p.lng;});
+    var minLat=Math.min.apply(null,lats), maxLat=Math.max.apply(null,lats);
+    var minLng=Math.min.apply(null,lngs), maxLng=Math.max.apply(null,lngs);
+    var midLat=(minLat+maxLat)/2, kx=Math.cos(midLat*Math.PI/180);
+    var spanLat=Math.max(maxLat-minLat, 0.004), spanLng=Math.max(maxLng-minLng, 0.004/Math.max(kx,0.1));
+    minLat=midLat-spanLat/2; maxLat=midLat+spanLat/2;
+    var midLng=(minLng+maxLng)/2; minLng=midLng-spanLng/2; maxLng=midLng+spanLng/2;
+
+    var W=700, H=460, P=56;
+    function px(p){
+      return {
+        x: P + (p.lng-minLng)/spanLng * (W-2*P),
+        y: P + (maxLat-p.lat)/spanLat * (H-2*P)
+      };
+    }
+
+    var body = pts.map(function(p){
+      var c=px(p);
+      if(p.me){
+        return '<g><circle cx="'+c.x.toFixed(1)+'" cy="'+c.y.toFixed(1)+'" r="7" style="fill:var(--blue);stroke:var(--bg)" stroke-width="3"/></g>';
+      }
+      var j=p.job, open=statusOf(j.status).open;
+      var label=(j.title||'Job').slice(0,22);
+      return '<g class="flat-pin" data-open="'+j.id+'">'+
+        '<circle cx="'+c.x.toFixed(1)+'" cy="'+c.y.toFixed(1)+'" r="14" style="fill:'+(open?'var(--ink)':'var(--ink-3)')+'"/>'+
+        '<text x="'+c.x.toFixed(1)+'" y="'+(c.y+4).toFixed(1)+'">'+pad(j.num).replace(/^0+(?=\d)/,'')+'</text>'+
+        '<text class="flat-lbl" x="'+c.x.toFixed(1)+'" y="'+(c.y+30).toFixed(1)+'">'+esc(label)+'</text>'+
+      '</g>';
+    }).join('');
+
+    var kmWide = kmBetween({lat:midLat,lng:minLng},{lat:midLat,lng:maxLng});
+    var nice=[0.1,0.25,0.5,1,2,5,10,25,50,100,250,500].reduce(function(a,b){
+      return Math.abs(b-kmWide/4)<Math.abs(a-kmWide/4)?b:a; },1);
+    var barPx = (nice/kmWide)*(W-2*P);
+
+    host.innerHTML =
+      '<div class="flat-tag">'+esc(reason)+'</div>'+
+      '<svg class="flat" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Plan of job locations">'+
+      body+
+      '<g><line x1="'+P+'" y1="'+(H-24)+'" x2="'+(P+barPx).toFixed(1)+'" y2="'+(H-24)+'" style="stroke:var(--ink-3)" stroke-width="2"/>'+
+      '<line x1="'+P+'" y1="'+(H-29)+'" x2="'+P+'" y2="'+(H-19)+'" style="stroke:var(--ink-3)" stroke-width="2"/>'+
+      '<line x1="'+(P+barPx).toFixed(1)+'" y1="'+(H-29)+'" x2="'+(P+barPx).toFixed(1)+'" y2="'+(H-19)+'" style="stroke:var(--ink-3)" stroke-width="2"/>'+
+      '<text class="flat-lbl" x="'+(P+barPx/2).toFixed(1)+'" y="'+(H-32)+'">'+nice+' km</text></g>'+
+      '</svg>';
+
+    Array.prototype.forEach.call(host.querySelectorAll('[data-open]'), function(g){
+      g.onclick=function(){ openDetail(g.getAttribute('data-open')); };
+    });
+
+    $('mapHint').textContent='Positions and distances are true; streets aren\u2019t drawn. Tap a pin to open the job, or use Directions inside it.';
+  }
+
+  function drawMap(){
+    var pinned = jobs.filter(function(j){ return j.lat!=null; });
+    $('leaf').classList.remove('is-flat');
+
+    if(!lmap){
+      $('leaf').innerHTML='';
+      lmap = L.map('leaf', {scrollWheelZoom:true}).setView([-25.3,133.8], 4);
+      var tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom:19, attribution:'&copy; OpenStreetMap'
+      });
+      // if the tiles won't come, fall back rather than showing a grey box
+      var errs=0, ok=false;
+      tiles.on('tileload', function(){ ok=true; });
+      tiles.on('tileerror', function(){
+        errs++;
+        if(!ok && errs>=4){ tiles.off(); flatMap('Offline plan view'); }
+      });
+      setTimeout(function(){ if(!ok && lmap) flatMap('Offline plan view'); }, 6000);
+      tiles.addTo(lmap);
+      lmap.on('popupopen', function(e){
+        var b=e.popup.getElement().querySelector('[data-open]');
+        if(b) b.onclick=function(){ openDetail(b.getAttribute('data-open')); };
+      });
+    }
+    if(layer) layer.remove();
+    layer = L.layerGroup().addTo(lmap);
+
+    pinned.forEach(function(j){
+      L.marker([j.lat,j.lng],{icon:pinIcon(j),title:j.title||'Job'})
+        .bindPopup(popupHtml(j)).addTo(layer);
+    });
+
+    if(myPos){
+      if(meMark) meMark.remove();
+      meMark = L.marker([myPos.lat,myPos.lng],{
+        icon:L.divIcon({className:'',iconSize:[18,18],iconAnchor:[9,9],html:'<div class="mk-me"></div>'}),
+        zIndexOffset:-100, title:'You'
+      }).addTo(lmap);
+    }
+
+    var pts = pinned.map(function(j){ return [j.lat,j.lng]; });
+    if(myPos) pts.push([myPos.lat,myPos.lng]);
+    if(pts.length>1) lmap.fitBounds(L.latLngBounds(pts).pad(0.25));
+    else if(pts.length===1) lmap.setView(pts[0],15);
+
+    lmap.invalidateSize();
+
+    var missing = jobs.filter(function(j){ return j.lat==null && j.address; }).length;
+    $('mapHint').textContent = pinned.length
+      ? (missing? missing+' job'+(missing===1?'':'s')+' still need locating — tap Locate addresses below.' : 'Tap a pin for directions or to open the job.')
+      : 'Nothing pinned yet. Add addresses to your jobs, then tap Locate addresses.';
+  }
+
+  function drawMini(j){
+    if(!leafletReady() || j.lat==null) return false;
+    if(lmini){ lmini.remove(); lmini=null; }
+    $('dMap').innerHTML='<div id="leafMini"></div>';
+    lmini = L.map('leafMini',{
+      scrollWheelZoom:false, dragging:false, zoomControl:false,
+      doubleClickZoom:false, boxZoom:false, keyboard:false, touchZoom:false, attributionControl:true
+    }).setView([j.lat,j.lng],16);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(lmini);
+    L.marker([j.lat,j.lng],{icon:pinIcon(j)}).addTo(lmini);
+    setTimeout(function(){ if(lmini) lmini.invalidateSize(); },80);
+    return true;
+  }
+
+  /* address -> coordinates. Two free, keyless services; we try each in turn
+     and report exactly what went wrong instead of a vague shrug. */
+  var GEOCODERS=[
+    { name:'OpenStreetMap',
+      url:function(q){ return 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q='+encodeURIComponent(q); },
+      parse:function(d){ return (d && d.length) ? {lat:parseFloat(d[0].lat), lng:parseFloat(d[0].lon)} : null; } },
+    { name:'Photon',
+      url:function(q){ return 'https://photon.komoot.io/api/?limit=1&q='+encodeURIComponent(q); },
+      parse:function(d){
+        var f = d && d.features && d.features[0];
+        return f ? {lat:f.geometry.coordinates[1], lng:f.geometry.coordinates[0]} : null; } }
+  ];
+
+  function sleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
+
+  async function geocode(addr){
+    var notes=[];
+    for(var i=0;i<GEOCODERS.length;i++){
+      let g=GEOCODERS[i];
+      let wait = 1100 - (Date.now()-lastGeo);
+      if(wait>0) await sleep(wait);
+      lastGeo = Date.now();
+      try{
+        let ctl = ('AbortController' in window) ? new AbortController() : null;
+        let timer = ctl ? setTimeout(function(){ ctl.abort(); }, 9000) : null;
+        let res = await fetch(g.url(addr), ctl ? {signal:ctl.signal} : {});
+        if(timer) clearTimeout(timer);
+        if(!res.ok){ notes.push(g.name+': HTTP '+res.status); continue; }
+        let hit = g.parse(await res.json());
+        if(hit && isFinite(hit.lat) && isFinite(hit.lng)){ hit.via=g.name; return hit; }
+        notes.push(g.name+': no match for that address');
+      }catch(e){
+        notes.push(g.name+': '+((e && e.name==='AbortError') ? 'timed out' : 'request blocked or offline'));
+      }
+    }
+    var err=new Error('geocode failed');
+    err.detail=notes.join('  ·  ');
+    throw err;
+  }
+
+  /* Coordinates typed or pasted in — a Google Maps link, or plain numbers.
+     Needs no network at all, so it always works. */
+  function parseLatLng(s){
+    if(!s) return null;
+    s=String(s).trim();
+    var m = s.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/)
+         || s.match(/[?&](?:q|query|destination|daddr|ll)=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/)
+         || s.match(/@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/)
+         || s.match(/^(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)$/);
+    if(!m) return null;
+    var la=parseFloat(m[1]), ln=parseFloat(m[2]);
+    if(!isFinite(la) || !isFinite(ln) || Math.abs(la)>90 || Math.abs(ln)>180) return null;
+    return {lat:la, lng:ln};
+  }
+
+  async function locateAll(){
+    var todo = jobs.filter(function(j){ return j.lat==null && j.address; });
+    if(!todo.length) return toast('Every job with an address is already on the map');
+    var done=0, missed=0, why='';
+    for(var i=0;i<todo.length;i++){
+      toast('Looking up '+(i+1)+' of '+todo.length+'…');
+      try{
+        var r = await geocode(todo[i].address);
+        todo[i].lat=r.lat; todo[i].lng=r.lng; todo[i].acc=null; todo[i].fromAddress=true;
+        done++;
+      }catch(e){
+        missed++; why = e.detail || 'no response';
+        // if nothing is getting through, stop rather than grinding on
+        if(done===0 && missed>=2) break;
+      }
+    }
+    await store.set(K_JOBS,jobs);
+    renderList();
+    if(done) drawMap();
+    if(done && !missed) toast(done+' located');
+    else if(done) toast(done+' located, '+missed+' not found');
+    else {
+      $('mapHint').textContent = 'Address lookup is unreachable from here — '+why+
+        '. Open a job and use Paste a location to set it by hand; that needs no internet.';
+      toast('Address lookup unavailable');
+    }
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function(b){
+    b.onclick=function(){
+      var t=b.getAttribute('data-tab');
+      if(t==='viewMap') openMapView();
+      else if(t==='viewRun') openRun();
+      else { current=null; show('viewList'); }
+    };
+  });
+
+  /* ---------------- time tracking ----------------
+     Sessions hold absolute timestamps, so a running timer keeps counting
+     even if the app is closed. {s:startMs} with no e means it's running. */
+
+  function sessionsOf(j){ return (j && j.sessions) || []; }
+  function openSession(j){
+    var ss=sessionsOf(j);
+    for(var i=ss.length-1;i>=0;i--){ if(!ss[i].e) return ss[i]; }
+    return null;
+  }
+  function isRunning(j){ return !!openSession(j); }
+  function runningJob(){
+    for(var i=0;i<jobs.length;i++){ if(isRunning(jobs[i])) return jobs[i]; }
+    return null;
+  }
+  function jobSeconds(j){
+    var total=0, now=Date.now();
+    sessionsOf(j).forEach(function(s){
+      var end = s.e || now;
+      if(end>s.s) total += (end-s.s)/1000;
+    });
+    return Math.floor(total);
+  }
+
+  function fmtClock(sec){
+    var h=Math.floor(sec/3600), m=Math.floor(sec%3600/60), s=Math.floor(sec%60);
+    return h+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+  }
+  function fmtDur(sec){
+    var h=Math.floor(sec/3600), m=Math.round(sec%3600/60);
+    if(m===60){ h++; m=0; }
+    if(!h && !m) return sec>0 ? 'under a minute' : '0m';
+    return (h?h+'h':'') + (h&&m?' ':'') + (m?m+'m':'');
+  }
+  function whenLabel(ms){
+    var d=new Date(ms);
+    return d.toLocaleDateString(undefined,{weekday:'short', day:'numeric', month:'short'})+
+           ' · '+d.toLocaleTimeString(undefined,{hour:'2-digit', minute:'2-digit'});
+  }
+
+  function rateFor(j){
+    var r = parseFloat(String(j && j.rate!=null ? j.rate : (settings.rate||'')).replace(/[^0-9.]/g,''));
+    return isFinite(r) && r>0 ? r : null;
+  }
+  function billedSeconds(j){
+    var sec=jobSeconds(j);
+    var block=parseInt(settings.roundTo||0,10);
+    if(!block || !sec) return sec;
+    var b=block*60;
+    return Math.ceil(sec/b)*b;
+  }
+  function money(n){
+    return '$'+n.toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+  function labourCost(j){
+    var r=rateFor(j);
+    if(!r) return null;
+    return (billedSeconds(j)/3600)*r;
+  }
+
+  var ticker=null;
+  function startTicking(){
+    if(ticker) return;
+    ticker=setInterval(paintTime, 1000);
+  }
+  function stopTicking(){
+    if(ticker){ clearInterval(ticker); ticker=null; }
+  }
+
+  /* repaint just the live bits — cheap enough to run every second */
+  function paintTime(){
+    var r=runningJob();
+    var pill=$('hdrTimer');
+    if(r){
+      pill.hidden=false;
+      $('hdrTimerText').textContent='#'+pad(r.num)+'  '+fmtClock(jobSeconds(r));
+      startTicking();
+    } else {
+      pill.hidden=true;
+      stopTicking();
+    }
+    if(current && !$('viewDetail').hidden){
+      var live=isRunning(current);
+      $('tClock').textContent=fmtClock(jobSeconds(current));
+      $('tClock').classList.toggle('idle', !live && jobSeconds(current)===0);
+      $('tDot').hidden=!live;
+    }
+  }
+
+  function renderTimer(j){
+    var sec=jobSeconds(j), live=isRunning(j), cost=labourCost(j), r=rateFor(j);
+
+    $('tClock').textContent=fmtClock(sec);
+    $('tClock').classList.toggle('idle', !live && sec===0);
+    $('tDot').hidden=!live;
+
+    var bits=[];
+    if(sec>0){
+      var billed=billedSeconds(j);
+      bits.push(sessionsOf(j).length+' session'+(sessionsOf(j).length===1?'':'s'));
+      if(billed!==sec) bits.push('billed as <b>'+fmtDur(billed)+'</b>');
+      if(cost!=null) bits.push('<b>'+money(cost)+'</b> at '+money(r)+'/hr');
+      else bits.push('set an hourly rate to see the cost');
+    } else {
+      bits.push(live ? 'Running now' : 'No time logged yet');
+    }
+    $('tMeta').innerHTML=bits.join(' · ');
+
+    $('tToggle').textContent = live ? 'Stop timer' : (sec>0 ? 'Start again' : 'Start timer');
+    $('tToggle').className = 'btn' + (live ? ' running' : '');
+
+    // a timer left running overnight is the classic way to ruin an invoice
+    var op=openSession(j);
+    if(op && (Date.now()-op.s) > 12*3600*1000){
+      $('tWarn').hidden=false;
+      $('tWarn').textContent='This timer has been running for '+fmtDur((Date.now()-op.s)/1000)+
+        '. If you forgot to stop it, stop it now and correct the session below.';
+    } else $('tWarn').hidden=true;
+
+    var ss=sessionsOf(j).slice().reverse();
+    $('tSessions').innerHTML = ss.map(function(s){
+      var i=sessionsOf(j).indexOf(s);
+      var len = s.e ? Math.floor((s.e-s.s)/1000) : Math.floor((Date.now()-s.s)/1000);
+      return '<li><span class="when">'+esc(whenLabel(s.s))+(s.e?'':' · running')+'</span>'+
+             '<span class="len">'+fmtDur(len)+'</span>'+
+             '<button class="drop" data-i="'+i+'" aria-label="Remove this session">&times;</button></li>';
+    }).join('');
+    Array.prototype.forEach.call($('tSessions').querySelectorAll('.drop'), function(b){
+      b.onclick=async function(){
+        var i=+b.getAttribute('data-i');
+        var ok=await ask('Remove this session?', fmtDur(
+          (function(s){ return Math.floor(((s.e||Date.now())-s.s)/1000); })(j.sessions[i])
+        )+' will come off this job.', 'Remove', true);
+        if(!ok) return;
+        j.sessions.splice(i,1);
+        await store.set(K_JOBS,jobs);
+        renderTimer(j); renderTotals(j); renderList(); paintTime();
+        toast('Session removed');
+      };
+    });
+  }
+
+  $('tToggle').onclick = async function(){
+    if(!current) return;
+    var j=current;
+    if(isRunning(j)){
+      openSession(j).e = Date.now();
+      await store.set(K_JOBS,jobs);
+      toast('Stopped at '+fmtDur(jobSeconds(j)));
+    } else {
+      var other=runningJob();
+      if(other && other.id!==j.id){
+        openSession(other).e = Date.now();
+        toast('Stopped the timer on #'+pad(other.num));
+      }
+      j.sessions = sessionsOf(j).concat([{s:Date.now()}]);
+      // if you're on the tools, say so
+      if(j.status==='quoted' || j.status==='booked'){ j.status='progress'; }
+      await store.set(K_JOBS,jobs);
+    }
+    openDetail(j.id);
+    paintTime();
+  };
+
+  $('tAdd').onclick = function(){
+    var b=$('tManual');
+    b.hidden=!b.hidden;
+    if(!b.hidden) $('tHrs').focus();
+  };
+
+  $('tAddGo').onclick = async function(){
+    if(!current) return;
+    var h=parseInt($('tHrs').value||'0',10), m=parseInt($('tMins').value||'0',10);
+    if(!isFinite(h)) h=0; if(!isFinite(m)) m=0;
+    var sec=h*3600+m*60;
+    if(sec<=0){ toast('Enter how long you were there'); return; }
+    var end=Date.now();
+    current.sessions = sessionsOf(current).concat([{s:end-sec*1000, e:end}]);
+    await store.set(K_JOBS,jobs);
+    $('tHrs').value=''; $('tMins').value=''; $('tManual').hidden=true;
+    renderTimer(current); renderTotals(current); renderList();
+    toast(fmtDur(sec)+' added');
+  };
+
+  $('hdrTimer').onclick = function(){
+    var r=runningJob();
+    if(r) openDetail(r.id);
+  };
+
+  /* ---------------- run sheet ---------------- */
+  function runnable(){
+    return jobs.filter(function(j){ return statusOf(j.status).open && target(j); });
+  }
+
+  function openRun(){
+    var ok=runnable();
+    runPicks = runPicks.filter(function(id){ return ok.some(function(j){return j.id===id;}); });
+    renderRun();
+    show('viewRun');
+  }
+
+  function renderRun(){
+    var list=runnable(), wrap=$('runList');
+    if(!list.length){
+      wrap.innerHTML='<div class="empty"><h2>No stops yet</h2>'+
+        '<p>Open jobs need an address or a saved pin before they can go on a run.</p></div>';
+      return;
+    }
+    wrap.innerHTML = list.map(function(j){
+      var i=runPicks.indexOf(j.id), on=i>-1;
+      var dist=(myPos && j.lat!=null)?niceKm(kmBetween(myPos,j)):'';
+      return '<button class="stop" data-id="'+j.id+'" aria-pressed="'+on+'">'+
+        '<span class="tick">'+(on?(i+1):'')+'</span>'+
+        '<span class="stop-body"><strong>'+esc(j.title||'Untitled job')+'</strong>'+
+        '<span>'+esc(j.address || (j.lat!=null?'Saved pin':'')) +'</span></span>'+
+        (dist?'<span class="stop-dist">'+dist+'</span>':'')+
+      '</button>';
+    }).join('');
+    Array.prototype.forEach.call(wrap.querySelectorAll('.stop'), function(el){
+      el.onclick=function(){
+        var id=el.getAttribute('data-id'), i=runPicks.indexOf(id);
+        if(i>-1) runPicks.splice(i,1);
+        else if(runPicks.length>=10) return toast('Google Maps tops out at 10 stops');
+        else runPicks.push(id);
+        renderRun();
+      };
+    });
+    syncRoute();
+  }
+
+  $('runClear').onclick=function(){ runPicks=[]; renderRun(); };
+
+  $('runNear').onclick=async function(){
+    var btn=this; btn.disabled=true;
+    try{
+      if(!myPos) { toast('Getting a fix…'); myPos = await here(false); }
+      var pinned=runnable().filter(function(j){ return j.lat!=null; });
+      if(!pinned.length){ toast('No jobs have a saved pin yet'); btn.disabled=false; return; }
+      // nearest-neighbour hop from where you are
+      var from=myPos, order=[], pool=pinned.slice();
+      while(pool.length && order.length<10){
+        var best=0;
+        for(var i=1;i<pool.length;i++){
+          if(kmBetween(from,pool[i]) < kmBetween(from,pool[best])) best=i;
+        }
+        from=pool[best]; order.push(pool[best].id); pool.splice(best,1);
+      }
+      runPicks=order; renderRun(); renderList();
+      toast(order.length+' stops, shortest hops first');
+    }catch(e){ toast(geoExcuse(e)); }
+    btn.disabled=false;
+  };
+
+  /* Keep the route link's href current so tapping it is a plain link
+     navigation — window.open gets silently blocked in too many contexts. */
+  function syncRoute(){
+    var a=$('barRoute');
+    if(!a) return;
+    var picked = runPicks.map(function(id){
+      return jobs.filter(function(j){ return j.id===id; })[0];
+    }).filter(Boolean);
+    var u = picked.length ? routeUrl(picked) : '';
+    a.href = u || '#';
+    a.setAttribute('aria-disabled', u ? 'false' : 'true');
+    a.textContent = '';
+    a.insertAdjacentHTML('afterbegin',
+      '<svg viewBox="0 0 24 24"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>'+
+      (picked.length ? 'Open route · '+picked.length+' stop'+(picked.length===1?'':'s') : 'Open route'));
+  }
+
+  /* ---------------- settings ---------------- */
+  $('openSettings').onclick = function(){
+    $('sName').value=settings.name||''; $('sTrader').value=settings.trader||'';
+    $('sPhone').value=settings.phone||''; $('sEmail').value=settings.email||'';
+    $('sAbn').value=settings.abn||''; $('sMapKey').value=settings.mapkey||'';
+    $('sRate').value=settings.rate||''; $('sRound').value=String(settings.roundTo||0);
+    $('sMarkup').value=settings.markup||'';
+    $('impNote').hidden=true; $('impCode').value='';
+    show('viewSettings');
+  };
+  async function saveSettings(){
+    settings={
+      name:$('sName').value.trim(), trader:$('sTrader').value.trim(),
+      phone:$('sPhone').value.trim(), email:$('sEmail').value.trim(),
+      abn:$('sAbn').value.trim(), mapkey:$('sMapKey').value.trim(),
+      rate:$('sRate').value.trim(), roundTo:parseInt($('sRound').value,10)||0,
+      markup:$('sMarkup').value.trim(), theme:themeChoice()
+    };
+    await store.set(K_SET,settings);
+    $('bizName').textContent = settings.name || 'Your business';
+    document.title = settings.name || 'Jobs';
+    show('viewList'); toast('Details saved');
+  }
+
+  /* ---------------- notes ----------------
+     A running log rather than one text box, so you can jot something
+     while you're standing there. Notes are yours by default — only the
+     ones you mark Share go out in the customer email. */
+
+  function logOf(j){ return (j && j.log) || []; }
+  var editingNote=-1;
+
+  function noteWhen(ms){
+    var d=new Date(ms);
+    return d.toLocaleDateString(undefined,{weekday:'short', day:'numeric', month:'short'})+
+           ' · '+d.toLocaleTimeString(undefined,{hour:'2-digit', minute:'2-digit'});
+  }
+
+  function renderNotes(j){
+    var log=logOf(j);
+    $('nEmpty').hidden = log.length>0;
+    var order = log.map(function(n,i){ return {n:n,i:i}; })
+                   .sort(function(a,b){ return (b.n.t||0)-(a.n.t||0); });
+    $('nList').innerHTML = order.map(function(o){
+      return '<li data-i="'+o.i+'">'+
+        '<div class="note-head">'+
+          '<span class="note-time">'+esc(noteWhen(o.n.t))+'</span>'+
+          '<button class="note-share" data-share="'+o.i+'" aria-pressed="'+(!!o.n.s)+'">'+
+            (o.n.s ? 'Shared' : 'Private')+'</button>'+
+          '<button class="drop" data-drop="'+o.i+'" aria-label="Delete this note">&times;</button>'+
+        '</div>'+
+        '<p class="note-text" data-edit="'+o.i+'">'+esc(o.n.x||'')+'</p></li>';
+    }).join('');
+
+    Array.prototype.forEach.call($('nList').querySelectorAll('[data-share]'), function(b){
+      b.onclick=async function(){
+        var i=+b.getAttribute('data-share');
+        j.log[i].s = !j.log[i].s;
+        await store.set(K_JOBS,jobs);
+        renderNotes(j);
+        $('dEmail').href = mailtoFor(j);
+        toast(j.log[i].s ? 'Will be included in the email' : 'Kept private');
+      };
+    });
+    Array.prototype.forEach.call($('nList').querySelectorAll('[data-drop]'), function(b){
+      b.onclick=async function(){
+        var i=+b.getAttribute('data-drop');
+        var ok=await ask('Delete this note?', 'It can\u2019t be brought back.', 'Delete', true);
+        if(!ok) return;
+        j.log.splice(i,1);
+        await store.set(K_JOBS,jobs);
+        renderNotes(j);
+        $('dEmail').href = mailtoFor(j);
+        toast('Note deleted');
+      };
+    });
+    Array.prototype.forEach.call($('nList').querySelectorAll('[data-edit]'), function(p){
+      p.onclick=function(){
+        var i=+p.getAttribute('data-edit');
+        editingNote=i;
+        $('nText').value=j.log[i].x||'';
+        $('nEditing').hidden=false;
+        $('nForm').hidden=false;
+        $('nText').focus();
+      };
+    });
+  }
+
+  function openNoteForm(fresh){
+    editingNote = fresh ? -1 : editingNote;
+    if(fresh){ $('nText').value=''; $('nEditing').hidden=true; }
+    $('nForm').hidden=false;
+    $('nText').focus();
+  }
+  function closeNoteForm(){
+    $('nForm').hidden=true;
+    $('nText').value='';
+    $('nEditing').hidden=true;
+    editingNote=-1;
+  }
+
+  $('nAdd').onclick=function(){
+    if($('nForm').hidden) openNoteForm(true);
+    else closeNoteForm();
+  };
+  $('nCancel').onclick=closeNoteForm;
+
+  $('nSave').onclick=async function(){
+    if(!current) return;
+    var text=$('nText').value.trim();
+    if(!text){ $('nText').focus(); toast('Write something first'); return; }
+    if(editingNote>-1 && current.log && current.log[editingNote]){
+      current.log[editingNote].x=text;
+      toast('Note updated');
+    } else {
+      current.log = logOf(current).concat([{t:Date.now(), x:text, s:false}]);
+      toast('Note added');
+    }
+    await store.set(K_JOBS,jobs);
+    closeNoteForm();
+    renderNotes(current);
+    $('dEmail').href = mailtoFor(current);
+  };
+
+  /* Older jobs kept one lump of text in `notes`. Move it into the log so
+     there's only one place notes live. It stays shared, as it was before. */
+  function migrateNotes(){
+    var touched=false;
+    jobs.forEach(function(j){
+      if(j.notes && String(j.notes).trim()){
+        j.log = [{t: Date.parse(j.created) || Date.now(), x: String(j.notes).trim(), s:true}]
+                  .concat(logOf(j));
+        delete j.notes;
+        touched=true;
+      }
+    });
+    return touched;
+  }
+
+  /* ---------------- parts and totals ---------------- */
+
+  function num(v){
+    var n=parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,''));
+    return isFinite(n) ? n : 0;
+  }
+  function partsOf(j){ return (j && j.parts) || []; }
+  function partsCost(j){
+    return partsOf(j).reduce(function(t,p){ return t + num(p.q)*num(p.c); }, 0);
+  }
+  function markupPct(){ return Math.max(0, num(settings.markup)); }
+  function partsCharge(j){ return partsCost(j) * (1 + markupPct()/100); }
+  function jobTotal(j){
+    var lab=labourCost(j);
+    return (lab||0) + partsCharge(j);
+  }
+
+  function renderParts(j){
+    var list=partsOf(j);
+    $('pEmpty').hidden = list.length>0;
+    $('pList').innerHTML = list.map(function(p,i){
+      var line = num(p.q)*num(p.c);
+      return '<li><span class="p-body"><span class="p-name">'+esc(p.n||'Part')+'</span>'+
+             '<span class="p-qty">'+num(p.q)+' × '+money(num(p.c))+'</span></span>'+
+             '<span class="p-sum">'+money(line)+'</span>'+
+             '<button class="drop" data-i="'+i+'" aria-label="Remove '+esc(p.n||'this part')+'">&times;</button></li>';
+    }).join('');
+    Array.prototype.forEach.call($('pList').querySelectorAll('.drop'), function(b){
+      b.onclick=async function(){
+        var i=+b.getAttribute('data-i'), p=j.parts[i];
+        var ok=await ask('Remove this part?', (p.n||'This part')+' will come off the job.', 'Remove', true);
+        if(!ok) return;
+        j.parts.splice(i,1);
+        await store.set(K_JOBS,jobs);
+        renderParts(j);
+        toast('Part removed');
+      };
+    });
+    renderTotals(j);
+  }
+
+  function renderTotals(j){
+    var lab=labourCost(j), sec=jobSeconds(j), pc=partsCost(j), pch=partsCharge(j);
+    var box=$('dTotals');
+    if(!sec && !partsOf(j).length){ box.hidden=true; return; }
+    box.hidden=false;
+
+    var rows='';
+    if(sec){
+      var r=rateFor(j), billed=billedSeconds(j);
+      rows += '<div class="tr"><span class="k">Labour · '+fmtDur(billed)+
+              (r?' at '+money(r)+'/hr':'')+'</span>'+
+              '<span class="v">'+(lab!=null?money(lab):'set a rate')+'</span></div>';
+    }
+    if(partsOf(j).length){
+      var mk=markupPct();
+      rows += '<div class="tr"><span class="k">Parts'+(mk?' · cost':'')+'</span>'+
+              '<span class="v">'+money(pc)+'</span></div>';
+      if(mk){
+        rows += '<div class="tr"><span class="k">Parts · with '+mk+'% markup</span>'+
+                '<span class="v">'+money(pch)+'</span></div>';
+      }
+    }
+
+    var total=jobTotal(j);
+    rows += '<div class="tr grand"><span class="k">Total</span><span class="v">'+money(total)+'</span></div>';
+
+    var quoted=num(j.quote);
+    if(quoted>0){
+      var diff=total-quoted;
+      var cls = diff>0.005 ? 'over' : (diff<-0.005 ? 'under' : '');
+      var word = diff>0.005 ? money(diff)+' over the quote'
+               : diff<-0.005 ? money(-diff)+' under the quote'
+               : 'exactly on the quote';
+      rows += '<p class="note">Quoted '+money(quoted)+' · <span class="'+cls+'">'+word+'</span></p>';
+    }
+    if(lab==null && sec) rows += '<p class="note">Add an hourly rate in your details to cost the time.</p>';
+
+    box.innerHTML=rows;
+  }
+
+  $('pAdd').onclick=function(){
+    var f=$('pForm');
+    f.hidden=!f.hidden;
+    if(!f.hidden){ $('pQty').value='1'; $('pName').focus(); }
+  };
+
+  $('pAddGo').onclick=async function(){
+    if(!current) return;
+    var name=$('pName').value.trim();
+    var q=num($('pQty').value || '1') || 1;
+    var c=num($('pCost').value);
+    if(!name){ $('pName').focus(); toast('Give the part a name'); return; }
+    current.parts = partsOf(current).concat([{n:name, q:q, c:c}]);
+    await store.set(K_JOBS,jobs);
+    $('pName').value=''; $('pQty').value='1'; $('pCost').value='';
+    $('pForm').hidden=true;
+    renderParts(current);
+    toast(name+' added');
+    $('pName').blur();
+  };
+
+  /* ---------------- office handoff ----------------
+     No server sits between the office and this phone, so jobs travel as a
+     small file or a pasted code. Each carries a `src` id, which is how we
+     avoid adding the same job twice if a batch gets sent again. */
+
+  function b64back(b){
+    return decodeURIComponent(escape(atob(b)));
+  }
+  function readPayload(raw){
+    var txt=String(raw||'').trim();
+    if(!txt) throw new Error('empty');
+    if(txt.indexOf('HJ1:')===0) txt=b64back(txt.slice(4).replace(/\s+/g,''));
+    var d=JSON.parse(txt);
+    if(!d || !d.jobs || !d.jobs.length) throw new Error('nojobs');
+    return d;
+  }
+
+  async function bringIn(raw){
+    var d;
+    try{ d=readPayload(raw); }
+    catch(e){
+      var why = e.message==='empty' ? 'Nothing to bring in — paste the code first'
+              : e.message==='nojobs' ? "That file doesn't have any jobs in it"
+              : "That doesn't look like a job file. Copy the whole code, including HJ1:";
+      $('impNote').hidden=false; $('impNote').textContent=why;
+      toast('Couldn\u2019t read that');
+      return;
+    }
+
+    if(d.kind==='backup') return restoreBackup(d);
+
+    var added=0, skipped=0;
+    var maxNum = jobs.reduce(function(m,x){ return Math.max(m, x.num||0); }, 0);
+    d.jobs.forEach(function(o){
+      if(o.src && jobs.some(function(j){ return j.src===o.src; })){ skipped++; return; }
+      maxNum++;
+      jobs.unshift({
+        id:'j'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+        src:o.src||null,
+        num:maxNum,
+        created:new Date().toISOString(),
+        title:o.title||'Untitled job',
+        customer:o.customer||'', phone:o.phone||'', email:o.email||'',
+        address:o.address||'', quote:o.quote||'', rate:o.rate||'',
+        status:o.status||'booked',
+        photoCount:0,
+        log:o.note ? [{t:Date.now(), x:o.note, s:false}] : [],
+        sessions:[], parts:[]
+      });
+      added++;
+    });
+
+    await store.set(K_JOBS,jobs);
+    $('impCode').value='';
+    $('impNote').hidden=false;
+    $('impNote').textContent = added
+      ? added+' job'+(added===1?'':'s')+' brought in'+(skipped?', '+skipped+' already had':'')+'.'
+      : 'Nothing new — all '+skipped+' of those are already here.';
+    renderList();
+    toast(added ? added+' job'+(added===1?'':'s')+' added' : 'Already up to date');
+    if(added){ current=null; show('viewList'); }
+  }
+
+  $('impGo').onclick=function(){ bringIn($('impCode').value); };
+  $('impFile').onclick=function(){ $('impIn').click(); };
+  $('impIn').onchange=function(){
+    var f=this.files && this.files[0];
+    if(!f) return;
+    var fr=new FileReader();
+    fr.onload=function(){ bringIn(fr.result); };
+    fr.onerror=function(){ toast('Couldn\u2019t open that file'); };
+    fr.readAsText(f);
+    this.value='';
+  };
+
+  /* ---------------- backup ---------------- */
+  function saveFile(name, text, mime){
+    try{
+      var blob=new Blob([text],{type:mime||'application/json'});
+      var url=URL.createObjectURL(blob);
+      var a=document.createElement('a');
+      a.href=url; a.download=name;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+      return true;
+    }catch(e){ return false; }
+  }
+
+  $('expGo').onclick=function(){
+    var out={
+      hj:1, kind:'backup', made:new Date().toISOString(),
+      settings:settings,
+      jobs:jobs.map(function(j){
+        var c={}; for(var k in j){ if(k!=='photoCount') c[k]=j[k]; }
+        c.photoCount=0; return c;
+      })
+    };
+    var stamp=new Date().toISOString().slice(0,10);
+    if(saveFile('handyman-backup-'+stamp+'.json', JSON.stringify(out,null,2))){
+      toast('Backup saved to your downloads');
+    } else {
+      $('impCode').value=JSON.stringify(out);
+      toast('Couldn\u2019t download — the backup is in the box above, copy it out');
+    }
+  };
+
+  $('expRestore').onclick=function(){ $('impIn').click(); };
+
+  async function restoreBackup(d){
+    var ok=await ask('Restore this backup?',
+      'It holds '+(d.jobs?d.jobs.length:0)+' jobs and will replace everything currently on this phone. Photos aren\u2019t part of a backup and will be lost.',
+      'Restore', true);
+    if(!ok) return;
+    jobs = d.jobs || [];
+    if(d.settings){
+      settings = d.settings;
+      await store.set(K_SET, settings);
+      applyTheme();
+      $('bizName').textContent = settings.name || 'Your business';
+    }
+    photoCache={};
+    await store.set(K_JOBS, jobs);
+    current=null;
+    renderList(); show('viewList'); paintTime();
+    toast(jobs.length+' jobs restored');
+  }
+
+  /* ---------------- appearance ---------------- */
+  var MOON='<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>';
+  var SUN='<circle cx="12" cy="12" r="4.4"/><path d="M12 2v2.2M12 19.8V22M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2 12h2.2M19.8 12H22M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6"/>';
+
+  function systemDark(){
+    return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  }
+  function themeChoice(){ return settings.theme || 'auto'; }
+  function resolvedTheme(){
+    var t=themeChoice();
+    return t==='auto' ? (systemDark()?'dark':'light') : t;
+  }
+  function applyTheme(){
+    var t=themeChoice(), el=document.documentElement;
+    if(t==='auto') el.removeAttribute('data-theme');
+    else el.setAttribute('data-theme', t);
+
+    var dark = resolvedTheme()==='dark';
+    var m=document.querySelector('meta[name="theme-color"]');
+    if(m) m.setAttribute('content', dark ? '#0C0E11' : '#FFFFFF');
+
+    $('themeIcon').innerHTML = dark ? SUN : MOON;
+    $('themeBtn').setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+
+    Array.prototype.forEach.call(document.querySelectorAll('#themeSeg button'), function(b){
+      b.setAttribute('aria-pressed', String(b.getAttribute('data-theme')===t));
+    });
+
+    // Leaflet caches container size and tile filters; nudge it after a repaint
+    if(lmap) setTimeout(function(){ try{ lmap.invalidateSize(); }catch(e){} }, 60);
+  }
+  async function setTheme(t){
+    settings.theme=t;
+    applyTheme();
+    await store.set(K_SET, settings);
+  }
+  $('themeBtn').onclick=function(){
+    setTheme(resolvedTheme()==='dark' ? 'light' : 'dark');
+  };
+  Array.prototype.forEach.call(document.querySelectorAll('#themeSeg button'), function(b){
+    b.onclick=function(){ setTheme(b.getAttribute('data-theme')); };
+  });
+  if(window.matchMedia){
+    var mq=window.matchMedia('(prefers-color-scheme: dark)');
+    var followSystem=function(){ if(themeChoice()==='auto') applyTheme(); };
+    if(mq.addEventListener) mq.addEventListener('change', followSystem);
+    else if(mq.addListener) mq.addListener(followSystem);
+  }
+  applyTheme(); // paint the icon straight away; boot re-runs it once settings load
+
+  /* ---------------- diagnostics ---------------- */
+  function reachImage(url, ms){
+    return new Promise(function(res){
+      var img=new Image(), done=false;
+      var t=setTimeout(function(){ if(!done){ done=true; res(false); } }, ms);
+      img.onload=function(){ if(!done){ done=true; clearTimeout(t); res(true); } };
+      img.onerror=function(){ if(!done){ done=true; clearTimeout(t); res(false); } };
+      img.src = url + (url.indexOf('?')>-1?'&':'?') + 'cb=' + Date.now();
+    });
+  }
+  async function reachFetch(url, ms){
+    try{
+      var ctl = ('AbortController' in window) ? new AbortController() : null;
+      var t = ctl ? setTimeout(function(){ ctl.abort(); }, ms) : null;
+      var r = await fetch(url, ctl?{signal:ctl.signal}:{});
+      if(t) clearTimeout(t);
+      return r.ok ? true : 'HTTP '+r.status;
+    }catch(e){ return (e && e.name==='AbortError') ? 'timed out' : 'blocked'; }
+  }
+
+  var lastReport='';
+
+  async function runCheck(){
+    var out=$('checkOut');
+    out.innerHTML='<p class="hint" style="margin:0">Testing…</p>';
+    $('copyCheck').hidden=true;
+
+    var rows=[];
+    function add(state, name, note){ rows.push({state:state, name:name, note:note}); paint(); }
+    function paint(){
+      out.innerHTML='<ul class="chk">'+rows.map(function(r){
+        var m = r.state==='ok'?'✓' : r.state==='no'?'✗' : '!';
+        return '<li><span class="mark '+r.state+'">'+m+'</span>'+
+               '<span class="what"><b>'+esc(r.name)+'</b><span>'+esc(r.note)+'</span></span></li>';
+      }).join('')+'</ul>';
+    }
+
+    var proto = location.protocol;
+    var where = proto==='file:' ? 'Opened straight from a file on this device'
+              : (proto==='http:'||proto==='https:') ? 'Served over the web ('+proto+'//'+(location.host||'?')+')'
+              : 'Running inside another page ('+proto+')';
+    add(proto==='https:'?'ok':(proto==='file:'?'no':'meh'), 'How it\u2019s running', where);
+
+    add(navigator.onLine===false?'no':'ok', 'Device connection',
+        navigator.onLine===false ? 'Your device says it\u2019s offline' : 'Device reports it\u2019s online');
+
+    add(leafletReady()?'ok':'no', 'Map software',
+        leafletReady() ? 'Loaded' : 'Didn\u2019t load — the plan view will be used instead');
+
+    var tile = await reachImage('https://tile.openstreetmap.org/0/0/0.png', 8000);
+    add(tile?'ok':'no', 'Map tiles', tile ? 'Reachable' : 'Blocked — no street map here');
+
+    var geo = await reachFetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=test', 9000);
+    add(geo===true?'ok':'no', 'Address lookup',
+        geo===true ? 'Reachable' : 'Not reachable ('+geo+') — use Paste a location');
+
+    add(window.storage?'ok':'meh', 'Saved data',
+        window.storage ? 'Jobs are saved between sessions' : 'Jobs will be lost when this closes');
+
+    add(navigator.geolocation?'ok':'no', 'GPS',
+        navigator.geolocation ? 'Available — permission is asked when you use it' : 'Not available here');
+
+    add(navigator.share?'ok':'meh', 'Share sheet',
+        navigator.share ? 'Available for sending photos' : 'Not available — Copy details still works');
+
+    var blocked = rows.filter(function(r){ return r.state==='no'; }).length;
+    var verdict;
+    if(!tile && geo!==true){
+      verdict = proto==='file:'
+        ? '<strong>The file is opened from your device, not from a web address.</strong> Browsers refuse outside requests in that mode, which blocks the street map and address lookup. Everything else works. To lift the block, the file needs to be published to a web address.'
+        : '<strong>Outside requests are being blocked here.</strong> Street map and address lookup won\u2019t work in this window. Try opening the file in Safari or Chrome directly, or publish it to a web address. Paste a location works either way.';
+    } else if(!blocked){
+      verdict = '<strong>Everything checks out.</strong>';
+    } else {
+      verdict = '<strong>Mostly working.</strong> The items marked ✗ above won\u2019t function here; the rest will.';
+    }
+    out.innerHTML += '<div class="verdict">'+verdict+'</div>';
+
+    lastReport = 'Jobs app check — '+new Date().toISOString()+'\n'+
+      'user agent: '+navigator.userAgent+'\n'+
+      rows.map(function(r){ return (r.state==='ok'?'OK  ':r.state==='no'?'FAIL':'WARN')+'  '+r.name+': '+r.note; }).join('\n');
+    $('copyCheck').hidden=false;
+  }
+
+  $('runCheck').onclick=function(){ runCheck(); };
+  $('copyCheck').onclick=function(){
+    if(!lastReport) return;
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(lastReport).then(function(){ toast('Report copied'); }, function(){ fallbackCopy(lastReport); });
+    } else fallbackCopy(lastReport);
+  };
+
+  /* ---------------- wiring ---------------- */
+  Array.prototype.forEach.call(document.querySelectorAll('.rail button'), function(b){
+    b.onclick=function(){
+      filter=b.getAttribute('data-filter');
+      Array.prototype.forEach.call(document.querySelectorAll('.rail button'), function(x){
+        x.setAttribute('aria-pressed', String(x===b));
+      });
+      renderList();
+    };
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.sortbar button'), function(b){
+    b.onclick=async function(){
+      var want=b.getAttribute('data-sort');
+      if(want==='near' && !myPos){
+        toast('Getting a fix…');
+        try{ myPos = await here(false); }
+        catch(e){ toast(geoExcuse(e)); return; }
+      }
+      sortBy=want;
+      Array.prototype.forEach.call(document.querySelectorAll('.sortbar button'), function(x){
+        x.setAttribute('aria-pressed', String(x===b));
+      });
+      renderList();
+    };
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll('[data-go]'), function(b){
+    b.onclick=function(){
+      var t=b.getAttribute('data-go');
+      if(t==='back'){ show(lastView); }
+      else { current=null; show('viewList'); }
+    };
+  });
+
+  /* header gets its hairline only once content is behind it */
+  (function(){
+    var h=document.querySelector('header'), on=false;
+    window.addEventListener('scroll', function(){
+      var want = window.scrollY > 4;
+      if(want!==on){ on=want; h.classList.toggle('scrolled', on); }
+    }, {passive:true});
+  })();
+
+  /* ---------------- boot ---------------- */
+  (async function(){
+    jobs = (await store.get(K_JOBS)) || [];
+    settings = (await store.get(K_SET)) || {};
+    applyTheme();
+    if(migrateNotes()) await store.set(K_JOBS,jobs);
+    if(settings.name){ $('bizName').textContent=settings.name; document.title=settings.name; }
+    renderList();
+    show('viewList');
+    paintTime();
+    var r=runningJob();
+    if(r) toast('Timer still running on #'+pad(r.num));
+  })();
+
+})();
+</script>
