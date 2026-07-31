@@ -89,14 +89,15 @@ Done: jobs list, photos via camera, email handoff, Google Maps directions,
 GPS pins, OpenStreetMap map with plan-view fallback, route planner, dark
 mode, per-job timer with hourly-rate costing, parts and materials with
 totals against the quote, notes log, office intake page, JSON backup and
-restore.
+restore, hosting over https (GitHub Pages).
+
+Live at:
+- https://csw007.github.io/handyman-jobs-app/handyman-jobs.html (phone app)
+- https://csw007.github.io/handyman-jobs-app/handyman-office.html (office intake)
 
 Not done, roughly in priority order:
 
-1. **Hosting.** Nothing network-dependent works until both files are served
-   over https. Blocked outbound requests are the root cause of most problems
-   reported so far. This gates everything below.
-2. **Supabase sync** so office staff and the phone share one database.
+1. **Supabase sync** so office staff and the phone share one database.
    Planned shape: `jobs` table with `id text primary key`, `data jsonb`,
    `deleted boolean`, `updated_at timestamptz`; RLS allowing any
    authenticated user. Offline-first — local stays the source of truth, sync
@@ -104,9 +105,24 @@ Not done, roughly in priority order:
    via a local tombstone list rather than soft-deleting in the jobs array, so
    the render paths don't all need filtering. Photos stay local; they'd
    swamp the free tier.
-3. **Invoicing** — a real invoice document rather than a plain-text email.
+2. **Invoicing** — a real invoice document rather than a plain-text email.
    GST is not handled anywhere yet and matters if the owner is registered.
-4. Google Maps embed key (optional; the OpenStreetMap view already works).
+3. Google Maps embed key (optional; the OpenStreetMap view already works).
+
+## Deploying
+
+Hosted on GitHub Pages, serving straight off the `main` branch — no build
+step. Any push to `main` goes live within about a minute.
+
+Easiest path: run `deploy.ps1` in this folder (PowerShell). It stages
+everything, asks for a one-line description, commits, and pushes.
+
+Manual equivalent:
+```
+git add -A
+git commit -m "describe the change"
+git push
+```
 
 ## About the owner
 
