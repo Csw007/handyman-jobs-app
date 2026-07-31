@@ -2,6 +2,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#FFFFFF">
 <title>Job intake</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
 <style>
   :root{
@@ -189,6 +190,34 @@
       </div>
       <textarea class="code" id="code" readonly spellcheck="false" style="margin-top:16px"></textarea>
     </div>
+
+    <div class="handoff" id="syncBox" style="margin-top:16px">
+      <h3>Or sync it straight across</h3>
+      <p id="syncSub">Sign in once and the batch goes to the phone next time it's online — no code to copy.</p>
+      <div id="syncSignedOut">
+        <div class="two">
+          <div class="field" style="margin-bottom:10px">
+            <label for="syncEmail">Email</label>
+            <input id="syncEmail" type="email" autocomplete="username" spellcheck="false" autocapitalize="off">
+          </div>
+          <div class="field" style="margin-bottom:10px">
+            <label for="syncPass">Password</label>
+            <input id="syncPass" type="password" autocomplete="current-password">
+          </div>
+        </div>
+        <div class="acts" style="margin-top:0">
+          <button class="btn ghost" id="syncSignIn">Sign in</button>
+        </div>
+        <p class="empty" id="syncErr" style="padding:8px 0 0" hidden></p>
+      </div>
+      <div id="syncSignedIn" hidden>
+        <p class="empty" id="syncStatus" style="padding:0 0 8px"></p>
+        <div class="acts" style="margin-top:0">
+          <button class="btn" id="syncSend">Send batch to phone</button>
+          <button class="btn ghost" id="syncSignOut">Sign out</button>
+        </div>
+      </div>
+    </div>
   </section>
 </div>
 
@@ -252,6 +281,7 @@
     });
 
     if(batch.length) $('code').value = 'HJ1:'+b64(JSON.stringify(payload()));
+    if($('syncSend')) $('syncSend').disabled = batch.length===0;
   }
 
   $('add').onclick=function(){
@@ -309,6 +339,74 @@
   $('clear').onclick=function(){
     if(!batch.length) return;
     batch=[]; render(); flash('Batch cleared');
+  };
+
+  /* ---------------- sync with the phone ----------------
+     Optional alternative to the code/file handoff above. Pushes the batch
+     into a Supabase "intake" queue; the phone absorbs and clears it next
+     time it's online and signed in. Same account as the phone app. */
+  var SUPABASE_URL = 'https://ubkaspmouxppyqupaxmk.supabase.co';
+  var SUPABASE_KEY = 'sb_publishable_kGebM5rzbZRcJVRbWmF8sQ_fZ7_OIWx';
+  var sb = (window.supabase && window.supabase.createClient)
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+  var sbUser = null;
+
+  function renderSyncUI(){
+    var out=$('syncSignedOut'), inEl=$('syncSignedIn');
+    if(sbUser){
+      out.hidden=true; inEl.hidden=false;
+      $('syncStatus').textContent='Signed in as '+sbUser.email+'.';
+    } else {
+      out.hidden=false; inEl.hidden=true;
+    }
+  }
+
+  if(sb){
+    sb.auth.onAuthStateChange(function(event, session){
+      sbUser = session ? session.user : null;
+      renderSyncUI();
+    });
+    sb.auth.getSession().then(function(s){
+      sbUser = s.data.session ? s.data.session.user : null;
+      renderSyncUI();
+    });
+  }
+
+  $('syncSignIn').onclick=async function(){
+    var email=$('syncEmail').value.trim(), pass=$('syncPass').value;
+    if(!sb){ $('syncErr').hidden=false; $('syncErr').textContent='Sync library failed to load — check your connection.'; return; }
+    if(!email || !pass){ $('syncErr').hidden=false; $('syncErr').textContent='Enter your email and password.'; return; }
+    $('syncErr').hidden=true;
+    try{
+      var res=await sb.auth.signInWithPassword({email:email, password:pass});
+      if(res.error) throw res.error;
+      $('syncPass').value='';
+      flash('Signed in');
+    }catch(e){
+      $('syncErr').hidden=false;
+      $('syncErr').textContent=(e && e.message) || "Couldn't sign in — check your details and try again.";
+    }
+  };
+  $('syncSignOut').onclick=async function(){
+    if(sb) await sb.auth.signOut();
+    flash('Signed out');
+  };
+  $('syncSend').onclick=async function(){
+    if(!sb || !sbUser || !batch.length) return;
+    var rows = batch.map(function(o){
+      return { id:o.src, data:{
+        title:o.title, customer:o.customer, phone:o.phone, email:o.email,
+        address:o.address, quote:o.quote, status:o.status, note:o.note
+      }};
+    });
+    try{
+      var res=await sb.from('intake').upsert(rows, {onConflict:'id'});
+      if(res.error) throw res.error;
+      batch=[]; render();
+      flash('Sent — the phone will pick it up next time it’s online');
+    }catch(e){
+      flash("Couldn't send — check the connection and try again");
+    }
   };
 
   render();

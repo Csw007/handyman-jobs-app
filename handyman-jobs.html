@@ -6,6 +6,7 @@
 <title>Jobs</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
 <style>
   :root{
@@ -826,6 +827,30 @@
     </div>
     <p class="hint" id="impNote" hidden></p>
 
+    <h3 class="shead">Sync with the office</h3>
+    <p class="hint" style="margin:0 0 14px">Sign in to share jobs between this phone and the office page. The app still works fully offline either way — it just catches up next time it's online.</p>
+    <div id="syncSignedOut">
+      <div class="field">
+        <label class="lbl" for="syncEmail">Email</label>
+        <input id="syncEmail" type="email" autocomplete="username" spellcheck="false" autocapitalize="off">
+      </div>
+      <div class="field">
+        <label class="lbl" for="syncPass">Password</label>
+        <input id="syncPass" type="password" autocomplete="current-password">
+      </div>
+      <div class="actions" style="margin:0 0 8px">
+        <button class="btn small" id="syncSignIn">Sign in</button>
+      </div>
+      <p class="hint" id="syncErr" hidden></p>
+    </div>
+    <div id="syncSignedIn" hidden>
+      <p class="hint" id="syncStatus" style="margin:0 0 14px"></p>
+      <div class="actions" style="margin:0">
+        <button class="btn ghost small" id="syncNow">Sync now</button>
+        <button class="btn ghost small" id="syncSignOut">Sign out</button>
+      </div>
+    </div>
+
     <h3 class="shead">Backup</h3>
     <p class="hint" style="margin:0 0 14px">Everything lives on this phone only. If you lose it or clear your browser, the jobs go with it. Save a copy somewhere now and then.</p>
     <div class="actions" style="margin:0">
@@ -913,21 +938,76 @@
 (function(){
   "use strict";
 
-  /* ---------------- storage (works in Claude artifacts, falls back to memory) ------------- */
+  /* ---------------- storage ----------------
+     Prefers window.storage (present when run inside the Claude Artifacts
+     sandbox). Standalone (GitHub Pages, file://), that API doesn't exist,
+     so this falls back to IndexedDB — chosen over localStorage because
+     photos are base64 data URLs that can run into localStorage's ~5MB cap.
+     Falls back further to an in-memory object only if IndexedDB itself is
+     unavailable (data then really is lost on close). */
   var mem = {};
+  var idbPromise = null;
+  function openIdb(){
+    if(idbPromise) return idbPromise;
+    idbPromise = new Promise(function(resolve){
+      if(!window.indexedDB){ resolve(null); return; }
+      var req = indexedDB.open('hj-store', 1);
+      req.onupgradeneeded = function(){ req.result.createObjectStore('kv'); };
+      req.onsuccess = function(){ resolve(req.result); };
+      req.onerror = function(){ resolve(null); };
+    });
+    return idbPromise;
+  }
+  function idbGet(k){
+    return openIdb().then(function(db){
+      if(!db) return undefined;
+      return new Promise(function(resolve){
+        var req = db.transaction('kv','readonly').objectStore('kv').get(k);
+        req.onsuccess = function(){ resolve(req.result); };
+        req.onerror = function(){ resolve(undefined); };
+      });
+    });
+  }
+  function idbSet(k,v){
+    return openIdb().then(function(db){
+      if(!db) return false;
+      return new Promise(function(resolve){
+        var req = db.transaction('kv','readwrite').objectStore('kv').put(v,k);
+        req.onsuccess = function(){ resolve(true); };
+        req.onerror = function(){ resolve(false); };
+      });
+    });
+  }
+  function idbDel(k){
+    return openIdb().then(function(db){
+      if(!db) return false;
+      return new Promise(function(resolve){
+        var req = db.transaction('kv','readwrite').objectStore('kv').delete(k);
+        req.onsuccess = function(){ resolve(true); };
+        req.onerror = function(){ resolve(false); };
+      });
+    });
+  }
+  var storageKind = window.storage ? 'artifact' : (window.indexedDB ? 'indexeddb' : 'memory');
   var store = {
     async get(k){
       try{ if(window.storage){ var r = await window.storage.get(k,false); return r ? JSON.parse(r.value) : null; } }
       catch(e){ /* missing key throws — treat as empty */ }
+      if(storageKind==='indexeddb'){
+        var v = await idbGet(k);
+        if(v!==undefined) return v;
+      }
       return (k in mem) ? mem[k] : null;
     },
     async set(k,v){
       mem[k]=v;
-      try{ if(window.storage){ await window.storage.set(k, JSON.stringify(v), false); } }catch(e){}
+      try{ if(window.storage){ await window.storage.set(k, JSON.stringify(v), false); return; } }catch(e){}
+      if(storageKind==='indexeddb') await idbSet(k,v);
     },
     async del(k){
       delete mem[k];
-      try{ if(window.storage){ await window.storage.delete(k,false); } }catch(e){}
+      try{ if(window.storage){ await window.storage.delete(k,false); return; } }catch(e){}
+      if(storageKind==='indexeddb') await idbDel(k);
     }
   };
 
@@ -1173,7 +1253,7 @@
     Array.prototype.forEach.call($('dStatus').querySelectorAll('button'), function(b){
       b.onclick=async function(){
         j.status=b.getAttribute('data-s');
-        await store.set(K_JOBS,jobs);
+        await saveJobs();
         openDetail(j.id); renderList(); toast('Marked '+statusOf(j.status).label.toLowerCase());
       };
     });
@@ -1255,7 +1335,7 @@
     var p = parseLatLng($('dLatLng').value);
     if(!p){ toast('Need two numbers like -37.56224, 143.85030 — or a Google Maps link'); return; }
     current.lat=p.lat; current.lng=p.lng; current.acc=null; current.fromAddress=false;
-    await store.set(K_JOBS,jobs);
+    await saveJobs();
     $('dManual').hidden=true; $('dGeoNote').hidden=true;
     renderMap(current); renderList();
     toast('Location set');
@@ -1269,7 +1349,7 @@
     try{
       var r = await geocode(current.address);
       current.lat=r.lat; current.lng=r.lng; current.acc=null; current.fromAddress=true;
-      await store.set(K_JOBS,jobs);
+      await saveJobs();
       renderMap(current); renderList();
       toast('Placed on the map via '+r.via);
     }catch(e){
@@ -1289,7 +1369,7 @@
       var p = await here(true);
       current.lat=p.lat; current.lng=p.lng; current.acc=p.acc; current.fromAddress=false;
       myPos=p;
-      await store.set(K_JOBS,jobs);
+      await saveJobs();
       renderMap(current); renderList();
       toast('Pin saved (±'+p.acc+'m)');
     }catch(e){ toast(geoExcuse(e)); }
@@ -1372,7 +1452,7 @@
         photoCache[id]=arr;
         await store.set(K_PHOTOS(id),arr);
         current.photoCount=arr.length;
-        await store.set(K_JOBS,jobs);
+        await saveJobs();
         renderPhotos(id); renderList(); toast('Photo removed');
       };
     });
@@ -1396,7 +1476,7 @@
     photoCache[current.id]=arr;
     await store.set(K_PHOTOS(current.id),arr);
     current.photoCount=arr.length;
-    await store.set(K_JOBS,jobs);
+    await saveJobs();
     renderPhotos(current.id); renderList();
     toast(arr.length+' photo'+(arr.length===1?'':'s')+' on this job');
   };
@@ -1485,7 +1565,8 @@
     paintTime();
     toast('Job #'+pad(j.num)+' deleted');
     await store.del(K_PHOTOS(id));
-    await store.set(K_JOBS,jobs);
+    await tombstone(id);
+    await saveJobs();
   };
 
   /* ---------------- form ---------------- */
@@ -1533,7 +1614,7 @@
     if(editingId){
       var j=jobs.filter(function(x){return x.id===editingId;})[0];
       Object.keys(payload).forEach(function(k){ j[k]=payload[k]; });
-      await store.set(K_JOBS,jobs);
+      await saveJobs();
       toast('Job updated');
       openDetail(j.id);
     } else {
@@ -1545,7 +1626,7 @@
       var first=$('fNotes').value.trim();
       payload.log = first ? [{t:Date.now(), x:first, s:false}] : [];
       jobs.unshift(payload);
-      await store.set(K_JOBS,jobs);
+      await saveJobs();
       renderList();
       toast('Job #'+pad(payload.num)+' saved');
       openDetail(payload.id);
@@ -1792,7 +1873,7 @@
         if(done===0 && missed>=2) break;
       }
     }
-    await store.set(K_JOBS,jobs);
+    await saveJobs();
     renderList();
     if(done) drawMap();
     if(done && !missed) toast(done+' located');
@@ -1948,7 +2029,7 @@
         )+' will come off this job.', 'Remove', true);
         if(!ok) return;
         j.sessions.splice(i,1);
-        await store.set(K_JOBS,jobs);
+        await saveJobs();
         renderTimer(j); renderTotals(j); renderList(); paintTime();
         toast('Session removed');
       };
@@ -1960,7 +2041,7 @@
     var j=current;
     if(isRunning(j)){
       openSession(j).e = Date.now();
-      await store.set(K_JOBS,jobs);
+      await saveJobs();
       toast('Stopped at '+fmtDur(jobSeconds(j)));
     } else {
       var other=runningJob();
@@ -1971,7 +2052,7 @@
       j.sessions = sessionsOf(j).concat([{s:Date.now()}]);
       // if you're on the tools, say so
       if(j.status==='quoted' || j.status==='booked'){ j.status='progress'; }
-      await store.set(K_JOBS,jobs);
+      await saveJobs();
     }
     openDetail(j.id);
     paintTime();
@@ -1991,7 +2072,7 @@
     if(sec<=0){ toast('Enter how long you were there'); return; }
     var end=Date.now();
     current.sessions = sessionsOf(current).concat([{s:end-sec*1000, e:end}]);
-    await store.set(K_JOBS,jobs);
+    await saveJobs();
     $('tHrs').value=''; $('tMins').value=''; $('tManual').hidden=true;
     renderTimer(current); renderTotals(current); renderList();
     toast(fmtDur(sec)+' added');
@@ -2091,6 +2172,7 @@
     $('sRate').value=settings.rate||''; $('sRound').value=String(settings.roundTo||0);
     $('sMarkup').value=settings.markup||'';
     $('impNote').hidden=true; $('impCode').value='';
+    renderSyncUI();
     show('viewSettings');
   };
   async function saveSettings(){
@@ -2141,7 +2223,7 @@
       b.onclick=async function(){
         var i=+b.getAttribute('data-share');
         j.log[i].s = !j.log[i].s;
-        await store.set(K_JOBS,jobs);
+        await saveJobs();
         renderNotes(j);
         $('dEmail').href = mailtoFor(j);
         toast(j.log[i].s ? 'Will be included in the email' : 'Kept private');
@@ -2153,7 +2235,7 @@
         var ok=await ask('Delete this note?', 'It can\u2019t be brought back.', 'Delete', true);
         if(!ok) return;
         j.log.splice(i,1);
-        await store.set(K_JOBS,jobs);
+        await saveJobs();
         renderNotes(j);
         $('dEmail').href = mailtoFor(j);
         toast('Note deleted');
@@ -2201,7 +2283,7 @@
       current.log = logOf(current).concat([{t:Date.now(), x:text, s:false}]);
       toast('Note added');
     }
-    await store.set(K_JOBS,jobs);
+    await saveJobs();
     closeNoteForm();
     renderNotes(current);
     $('dEmail').href = mailtoFor(current);
@@ -2255,7 +2337,7 @@
         var ok=await ask('Remove this part?', (p.n||'This part')+' will come off the job.', 'Remove', true);
         if(!ok) return;
         j.parts.splice(i,1);
-        await store.set(K_JOBS,jobs);
+        await saveJobs();
         renderParts(j);
         toast('Part removed');
       };
@@ -2316,7 +2398,7 @@
     var c=num($('pCost').value);
     if(!name){ $('pName').focus(); toast('Give the part a name'); return; }
     current.parts = partsOf(current).concat([{n:name, q:q, c:c}]);
-    await store.set(K_JOBS,jobs);
+    await saveJobs();
     $('pName').value=''; $('pQty').value='1'; $('pCost').value='';
     $('pForm').hidden=true;
     renderParts(current);
@@ -2355,9 +2437,25 @@
 
     if(d.kind==='backup') return restoreBackup(d);
 
+    var result = await absorbOfficeJobs(d.jobs);
+    $('impCode').value='';
+    $('impNote').hidden=false;
+    $('impNote').textContent = result.added
+      ? result.added+' job'+(result.added===1?'':'s')+' brought in'+(result.skipped?', '+result.skipped+' already had':'')+'.'
+      : 'Nothing new — all '+result.skipped+' of those are already here.';
+    renderList();
+    toast(result.added ? result.added+' job'+(result.added===1?'':'s')+' added' : 'Already up to date');
+    if(result.added){ current=null; show('viewList'); }
+  }
+
+  // Shared by pasted/file handoffs and by the intake sync pull — both hand
+  // over the same office-shaped job objects (src, title, customer, ...).
+  // The phone stays the only place that assigns real id/num, so two
+  // devices importing offline at the same time can't collide.
+  async function absorbOfficeJobs(list){
     var added=0, skipped=0;
     var maxNum = jobs.reduce(function(m,x){ return Math.max(m, x.num||0); }, 0);
-    d.jobs.forEach(function(o){
+    (list||[]).forEach(function(o){
       if(o.src && jobs.some(function(j){ return j.src===o.src; })){ skipped++; return; }
       maxNum++;
       jobs.unshift({
@@ -2375,16 +2473,8 @@
       });
       added++;
     });
-
-    await store.set(K_JOBS,jobs);
-    $('impCode').value='';
-    $('impNote').hidden=false;
-    $('impNote').textContent = added
-      ? added+' job'+(added===1?'':'s')+' brought in'+(skipped?', '+skipped+' already had':'')+'.'
-      : 'Nothing new — all '+skipped+' of those are already here.';
-    renderList();
-    toast(added ? added+' job'+(added===1?'':'s')+' added' : 'Already up to date');
-    if(added){ current=null; show('viewList'); }
+    if(added) await saveJobs();
+    return {added:added, skipped:skipped};
   }
 
   $('impGo').onclick=function(){ bringIn($('impCode').value); };
@@ -2445,7 +2535,7 @@
       $('bizName').textContent = settings.name || 'Your business';
     }
     photoCache={};
-    await store.set(K_JOBS, jobs);
+    await saveJobs();
     current=null;
     renderList(); show('viewList'); paintTime();
     toast(jobs.length+' jobs restored');
@@ -2557,8 +2647,10 @@
     add(geo===true?'ok':'no', 'Address lookup',
         geo===true ? 'Reachable' : 'Not reachable ('+geo+') — use Paste a location');
 
-    add(window.storage?'ok':'meh', 'Saved data',
-        window.storage ? 'Jobs are saved between sessions' : 'Jobs will be lost when this closes');
+    add(storageKind!=='memory'?'ok':'meh', 'Saved data',
+        storageKind==='artifact' ? 'Jobs are saved between sessions' :
+        storageKind==='indexeddb' ? 'Jobs are saved on this device between sessions' :
+        'Jobs will be lost when this closes');
 
     add(navigator.geolocation?'ok':'no', 'GPS',
         navigator.geolocation ? 'Available — permission is asked when you use it' : 'Not available here');
@@ -2636,18 +2728,201 @@
     }, {passive:true});
   })();
 
+  /* ---------------- sync with Supabase ----------------
+     Optional. The app is fully usable offline and signed out — this only
+     shares the `jobs` array with the office page when a network and a
+     session are both available. Photos and settings never leave the
+     device (see CLAUDE.md). */
+  var SUPABASE_URL = 'https://ubkaspmouxppyqupaxmk.supabase.co';
+  var SUPABASE_KEY = 'sb_publishable_kGebM5rzbZRcJVRbWmF8sQ_fZ7_OIWx';
+  var K_DEL = 'hj:deleted';
+  var sb = (window.supabase && window.supabase.createClient)
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+  var sbUser = null;
+  var lastSavedJobsJSON = null;
+  var pushTimer = null;
+  var lastSyncAt = null;
+
+  async function tombstone(id){
+    var tombs = (await store.get(K_DEL)) || [];
+    tombs = tombs.filter(function(t){ return t.id!==id; });
+    tombs.push({id:id, deleted_at: Date.now()});
+    await store.set(K_DEL, tombs);
+  }
+
+  function stripStamp(j){ var c=Object.assign({}, j); delete c.updated_at; return c; }
+
+  // Persists `jobs`, stamping updated_at only on entries whose content
+  // actually changed since the last save — needed so sync can tell which
+  // side of a merge is newer without re-stamping untouched jobs.
+  async function saveJobs(){
+    var prevById = {};
+    (lastSavedJobsJSON ? JSON.parse(lastSavedJobsJSON) : []).forEach(function(j){ prevById[j.id]=j; });
+    jobs.forEach(function(j){
+      var before = prevById[j.id];
+      if(!before || JSON.stringify(stripStamp(before)) !== JSON.stringify(stripStamp(j))){
+        j.updated_at = Date.now();
+      }
+    });
+    await store.set(K_JOBS, jobs);
+    lastSavedJobsJSON = JSON.stringify(jobs);
+    if(sbUser) schedulePush();
+  }
+
+  function schedulePush(){
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(pushJobs, 3000);
+  }
+
+  async function pushJobs(){
+    if(!sb || !sbUser) return;
+    var rows = jobs.map(function(j){
+      return { id:j.id, data:j, deleted:false, updated_at:new Date(j.updated_at||Date.now()).toISOString() };
+    });
+    var tombs = (await store.get(K_DEL)) || [];
+    tombs.forEach(function(t){
+      rows.push({ id:t.id, data:{}, deleted:true, updated_at:new Date(t.deleted_at).toISOString() });
+    });
+    if(!rows.length) return;
+    try{
+      var res = await sb.from('jobs').upsert(rows, {onConflict:'id'});
+      if(res.error) throw res.error;
+      lastSyncAt = Date.now();
+    }catch(e){ /* offline or blocked — next debounce/interval will retry */ }
+  }
+
+  async function pullJobs(){
+    if(!sb || !sbUser) return;
+    try{
+      var res = await sb.from('jobs').select('id,data,deleted,updated_at');
+      if(res.error) throw res.error;
+      var tombs = (await store.get(K_DEL)) || [];
+      var tombById = {}; tombs.forEach(function(t){ tombById[t.id]=t.deleted_at; });
+      var localById = {}; jobs.forEach(function(j){ localById[j.id]=j; });
+      var changed = false;
+      (res.data||[]).forEach(function(row){
+        var remoteUpdated = row.updated_at ? Date.parse(row.updated_at) : 0;
+        var localTomb = tombById[row.id];
+        if(localTomb && localTomb >= remoteUpdated) return; // our delete is newer — schedulePush will re-assert it
+        if(row.deleted){
+          if(localById[row.id]){
+            jobs = jobs.filter(function(x){ return x.id!==row.id; });
+            delete photoCache[row.id];
+            changed = true;
+          }
+          return;
+        }
+        var local = localById[row.id];
+        if(!local){
+          jobs.push(Object.assign({}, row.data, {updated_at: remoteUpdated}));
+          changed = true;
+        } else if(remoteUpdated > (local.updated_at||0)){
+          Object.assign(local, row.data, {updated_at: remoteUpdated});
+          changed = true;
+        }
+      });
+      if(changed){
+        await store.set(K_JOBS, jobs);
+        lastSavedJobsJSON = JSON.stringify(jobs);
+        renderList();
+        if(current){ var c=jobs.filter(function(x){ return x.id===current.id; })[0]; if(c) current=c; }
+      }
+      lastSyncAt = Date.now();
+    }catch(e){ /* offline or blocked — next interval will retry */ }
+  }
+
+  // Rows staff added on the office intake page. Reuses the same merge path
+  // as a pasted/file handoff, then clears the rows it consumed so the
+  // queue doesn't grow forever.
+  async function pullIntake(){
+    if(!sb || !sbUser) return;
+    try{
+      var res = await sb.from('intake').select('id,data');
+      var rows = res.data||[];
+      if(res.error || !rows.length) return;
+      var list = rows.map(function(r){ return Object.assign({src:r.id}, r.data); });
+      var result = await absorbOfficeJobs(list);
+      if(result.added || result.skipped){
+        await sb.from('intake').delete().in('id', rows.map(function(r){ return r.id; }));
+      }
+      if(result.added) toast(result.added+' job'+(result.added===1?'':'s')+' from the office');
+    }catch(e){ /* offline or blocked — next interval will retry */ }
+  }
+
+  async function syncNow(){ await pushJobs(); await pullJobs(); await pullIntake(); renderSyncUI(); }
+
+  function fmtSyncTime(){
+    if(!lastSyncAt) return 'Not synced yet';
+    var mins = Math.round((Date.now()-lastSyncAt)/60000);
+    return mins<1 ? 'Synced just now' : 'Last synced '+mins+' min ago';
+  }
+
+  function renderSyncUI(){
+    var out = $('syncSignedOut'), inEl = $('syncSignedIn');
+    if(!out || !inEl) return;
+    if(sbUser){
+      out.hidden = true; inEl.hidden = false;
+      $('syncStatus').textContent = 'Signed in as '+sbUser.email+'. '+fmtSyncTime()+'.';
+    } else {
+      out.hidden = false; inEl.hidden = true;
+    }
+  }
+
+  if(sb){
+    sb.auth.onAuthStateChange(function(event, session){
+      sbUser = session ? session.user : null;
+      renderSyncUI();
+      if(sbUser){ syncNow().then(renderList); }
+    });
+    window.addEventListener('online', function(){ if(sbUser) syncNow().then(renderList); });
+    setInterval(function(){ if(sbUser && navigator.onLine!==false) syncNow().then(renderList); }, 60000);
+  }
+
+  if($('syncSignIn')) $('syncSignIn').onclick = async function(){
+    var email = $('syncEmail').value.trim(), pass = $('syncPass').value;
+    if(!sb){ $('syncErr').hidden=false; $('syncErr').textContent='Sync library failed to load — check your connection.'; return; }
+    if(!email || !pass){ $('syncErr').hidden=false; $('syncErr').textContent='Enter your email and password.'; return; }
+    $('syncErr').hidden = true;
+    try{
+      var res = await sb.auth.signInWithPassword({email:email, password:pass});
+      if(res.error) throw res.error;
+      $('syncPass').value = '';
+      toast('Signed in');
+    }catch(e){
+      $('syncErr').hidden=false;
+      $('syncErr').textContent = (e && e.message) || "Couldn't sign in — check your details and try again.";
+    }
+  };
+  if($('syncSignOut')) $('syncSignOut').onclick = async function(){
+    if(sb) await sb.auth.signOut();
+    toast('Signed out');
+  };
+  if($('syncNow')) $('syncNow').onclick = async function(){
+    toast('Syncing…');
+    await syncNow();
+    toast('Synced');
+  };
+
   /* ---------------- boot ---------------- */
   (async function(){
     jobs = (await store.get(K_JOBS)) || [];
     settings = (await store.get(K_SET)) || {};
+    jobs.forEach(function(j){ if(!j.updated_at) j.updated_at = Date.parse(j.created) || Date.now(); });
+    lastSavedJobsJSON = JSON.stringify(jobs);
     applyTheme();
-    if(migrateNotes()) await store.set(K_JOBS,jobs);
+    if(migrateNotes()) await saveJobs();
     if(settings.name){ $('bizName').textContent=settings.name; document.title=settings.name; }
     renderList();
     show('viewList');
     paintTime();
     var r=runningJob();
     if(r) toast('Timer still running on #'+pad(r.num));
+    if(sb){
+      var s = await sb.auth.getSession();
+      sbUser = s.data.session ? s.data.session.user : null;
+      renderSyncUI();
+      if(sbUser) syncNow().then(function(){ renderList(); renderSyncUI(); });
+    }
   })();
 
 })();
