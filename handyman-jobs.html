@@ -939,6 +939,7 @@
   </div>
 </div>
 <input type="file" id="camIn" accept="image/*" capture="environment" multiple hidden>
+<input type="file" id="libIn" accept="image/*" multiple hidden>
 <input type="file" id="impIn" accept=".json,application/json,text/plain" hidden>
 
 <script>
@@ -1452,9 +1453,11 @@
       return '<div class="shot"><img src="'+src+'" alt="Job photo '+(i+1)+'">'+
              '<button class="kill" data-i="'+i+'" aria-label="Remove photo '+(i+1)+'">&times;</button></div>';
     }).join('');
-    html += '<button class="add-shot" id="addShot"><svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Add</button>';
+    html += '<button class="add-shot" id="addShot"><svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Camera</button>';
+    html += '<button class="add-shot" id="addFromLib"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>Library</button>';
     $('dPhotos').innerHTML = html;
     $('addShot').onclick = takePhoto;
+    $('addFromLib').onclick = pickFromLibrary;
     Array.prototype.forEach.call($('dPhotos').querySelectorAll('.kill'), function(b){
       b.onclick = async function(ev){
         ev.stopPropagation();
@@ -1477,8 +1480,15 @@
     input.click();
   }
 
-  $('camIn').onchange = async function(){
-    var files = Array.prototype.slice.call(this.files||[]);
+  function pickFromLibrary(){
+    if(!current) return;
+    var input=$('libIn');
+    input.value='';
+    input.click();
+  }
+
+  async function addPhotoFiles(files){
+    files = Array.prototype.slice.call(files||[]);
     if(!files.length || !current) return;
     toast(files.length>1 ? 'Adding '+files.length+' photos…' : 'Adding photo…');
     var arr = await getPhotos(current.id);
@@ -1491,7 +1501,10 @@
     await saveJobs();
     renderPhotos(current.id); renderList();
     toast(arr.length+' photo'+(arr.length===1?'':'s')+' on this job');
-  };
+  }
+
+  $('camIn').onchange = function(){ addPhotoFiles(this.files); };
+  $('libIn').onchange = function(){ addPhotoFiles(this.files); };
 
   // downscale so a phone photo doesn't eat all the storage
   function shrink(file){
