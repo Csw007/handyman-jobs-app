@@ -1,7 +1,12 @@
-# Handyman jobs app
+# Handyman jobs app — branded "Runsheet"
 
 A job management app for a solo handyman business. Two standalone HTML files,
 no build step, no framework, no package manager.
+
+The app's product name is **Runsheet** (browser tab title, home-screen name,
+office page header). File and repo names stay as `handyman-jobs-app` /
+`handyman-jobs.html` on purpose — renaming those would change the live
+GitHub Pages URL and break the phone's existing home-screen icon.
 
 ## Files
 
