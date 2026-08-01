@@ -1271,6 +1271,7 @@
 
     var f=[];
     if(j.customer) f.push(['Customer', esc(j.customer)]);
+    if(j.num)      f.push(['Job number', esc(j.num)]);
     if(j.phone)    f.push(['Phone', '<a href="tel:'+esc(j.phone.replace(/\s/g,''))+'">'+esc(j.phone)+'</a>']);
     if(j.email)    f.push(['Email', '<a href="mailto:'+esc(j.email)+'">'+esc(j.email)+'</a>']);
     if(j.address)  f.push(['Site', '<a href="https://maps.google.com/?q='+encodeURIComponent(j.address)+'" target="_blank" rel="noopener">'+esc(j.address)+'</a>']);
