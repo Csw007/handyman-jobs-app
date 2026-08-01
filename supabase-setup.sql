@@ -1,6 +1,7 @@
--- Run this once in the Supabase SQL Editor (Project -> SQL Editor -> New query).
+-- Run this in the Supabase SQL Editor (Project -> SQL Editor -> New query).
 -- Sets up the two tables the app syncs through and locks both down to
 -- signed-in users only (the publishable key alone grants no access).
+-- Safe to run more than once if an earlier attempt got partway through.
 
 create table if not exists jobs (
   id text primary key,
@@ -11,6 +12,7 @@ create table if not exists jobs (
 
 alter table jobs enable row level security;
 
+drop policy if exists "authenticated read/write jobs" on jobs;
 create policy "authenticated read/write jobs"
   on jobs for all
   to authenticated
@@ -27,6 +29,7 @@ create table if not exists intake (
 
 alter table intake enable row level security;
 
+drop policy if exists "authenticated read/write intake" on intake;
 create policy "authenticated read/write intake"
   on intake for all
   to authenticated

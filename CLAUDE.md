@@ -89,25 +89,29 @@ Done: jobs list, photos via camera, email handoff, Google Maps directions,
 GPS pins, OpenStreetMap map with plan-view fallback, route planner, dark
 mode, per-job timer with hourly-rate costing, parts and materials with
 totals against the quote, notes log, office intake page, JSON backup and
-restore, hosting over https (GitHub Pages).
+restore, hosting over https (GitHub Pages), Supabase sync between the
+phone and office intake (optional sign-in, offline-first).
 
 Live at:
 - https://csw007.github.io/handyman-jobs-app/handyman-jobs.html (phone app)
 - https://csw007.github.io/handyman-jobs-app/handyman-office.html (office intake)
 
+**Sync details:** sign in (Settings -> Sync with the office, or the same
+section on the office page) to share jobs between devices. Fully optional —
+the app works offline and signed out exactly as before; sync just layers on
+top. Local storage was also fixed in the process: it used to rely on
+`window.storage` (only present inside the Claude Artifacts sandbox), so
+every reload silently lost all jobs once hosted standalone. It now falls
+back to IndexedDB instead, which persists on-device regardless of sync.
+One accepted limitation: job numbers (`#007` etc.) are assigned locally per
+device, so two devices creating jobs offline at the same moment could both
+claim the same number — cosmetic only, not a data-loss risk.
+
 Not done, roughly in priority order:
 
-1. **Supabase sync** so office staff and the phone share one database.
-   Planned shape: `jobs` table with `id text primary key`, `data jsonb`,
-   `deleted boolean`, `updated_at timestamptz`; RLS allowing any
-   authenticated user. Offline-first — local stays the source of truth, sync
-   pushes and pulls on a debounce, last-write-wins on `updated_at`. Deletes
-   via a local tombstone list rather than soft-deleting in the jobs array, so
-   the render paths don't all need filtering. Photos stay local; they'd
-   swamp the free tier.
-2. **Invoicing** — a real invoice document rather than a plain-text email.
+1. **Invoicing** — a real invoice document rather than a plain-text email.
    GST is not handled anywhere yet and matters if the owner is registered.
-3. Google Maps embed key (optional; the OpenStreetMap view already works).
+2. Google Maps embed key (optional; the OpenStreetMap view already works).
 
 ## Deploying
 
