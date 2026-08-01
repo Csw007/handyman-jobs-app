@@ -135,6 +135,17 @@
       <input id="title" placeholder="Replace kitchen mixer tap" autocomplete="off">
     </div>
     <div class="field">
+      <label for="jobNum">Job number</label>
+      <input id="jobNum" placeholder="e.g. 104" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="clientSel">Client</label>
+      <select id="clientSel">
+        <option value="">Type new / one-off customer</option>
+        <option value="__new__">+ Add new client</option>
+      </select>
+    </div>
+    <div class="field">
       <label for="customer">Customer</label>
       <input id="customer" placeholder="Full name" autocomplete="off">
     </div>
@@ -266,7 +277,7 @@
       if(j.quote) extra.push(j.quote);
       if(j.phone) extra.push(j.phone);
       return '<li><span class="q-n">'+(i+1)+'</span>'+
-        '<span class="q-body"><strong>'+esc(j.title)+'</strong>'+
+        '<span class="q-body"><strong>'+(j.num?'#'+esc(j.num)+' · ':'')+esc(j.title)+'</strong>'+
         (line?'<span>'+esc(line)+'</span>':'')+
         (extra.length?'<span>'+esc(extra.join(' · '))+'</span>':'')+
         '</span>'+
@@ -284,23 +295,33 @@
     if($('syncSend')) $('syncSend').disabled = batch.length===0;
   }
 
-  $('add').onclick=function(){
+  $('add').onclick=async function(){
     var title=$('title').value.trim();
     if(!title){ $('title').focus(); flash('Give the job a name'); return; }
+    var customer=$('customer').value.trim(), phone=$('phone').value.trim(),
+        email=$('email').value.trim(), address=$('address').value.trim();
+    if(officeClientId==='__new__' && customer && sb && sbUser){
+      try{
+        var c={ id:'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+                name:customer, phone:phone, email:email, address:address };
+        var res=await sb.from('clients').upsert(
+          [{id:c.id, data:c, deleted:false, updated_at:new Date().toISOString()}], {onConflict:'id'});
+        if(!res.error){ clients.push(c); renderClientOptions(); }
+      }catch(e){ /* still adds the job to the batch either way */ }
+    }
     batch.push({
       src:newId(),
+      num:$('jobNum').value.trim(),
       title:title,
-      customer:$('customer').value.trim(),
-      phone:$('phone').value.trim(),
-      email:$('email').value.trim(),
-      address:$('address').value.trim(),
+      customer:customer, phone:phone, email:email, address:address,
       quote:$('quote').value.trim(),
       status:$('status').value,
       note:$('note').value.trim()
     });
-    ['title','customer','phone','email','address','quote','note'].forEach(function(id){
+    ['title','jobNum','customer','phone','email','address','quote','note'].forEach(function(id){
       $(id).value='';
     });
+    officeClientId=null; $('clientSel').value='';
     $('title').focus();
     render();
     flash('Added — '+batch.length+' in the batch');
@@ -350,6 +371,44 @@
   var sb = (window.supabase && window.supabase.createClient)
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
   var sbUser = null;
+  var clients = [];
+  var officeClientId = null;
+
+  function renderClientOptions(){
+    var opts = ['<option value="">Type new / one-off customer</option>'];
+    clients.slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); })
+      .forEach(function(c){
+        opts.push('<option value="'+esc(c.id)+'">'+esc(c.name||'Unnamed')+'</option>');
+      });
+    opts.push('<option value="__new__">+ Add new client</option>');
+    $('clientSel').innerHTML = opts.join('');
+  }
+
+  async function loadClients(){
+    if(!sb || !sbUser) return;
+    try{
+      var res = await sb.from('clients').select('id,data');
+      if(res.error) throw res.error;
+      clients = (res.data||[]).map(function(r){ return Object.assign({id:r.id}, r.data); });
+      renderClientOptions();
+    }catch(e){ /* offline or blocked — dropdown just stays as typed-entry only */ }
+  }
+
+  $('clientSel').onchange = function(){
+    var v = $('clientSel').value;
+    if(v==='__new__'){
+      officeClientId='__new__';
+      $('customer').value=''; $('phone').value=''; $('email').value=''; $('address').value='';
+      $('customer').focus();
+      return;
+    }
+    officeClientId = v || null;
+    var c = clients.filter(function(x){ return x.id===v; })[0];
+    if(c){
+      $('customer').value=c.name||''; $('phone').value=c.phone||'';
+      $('email').value=c.email||''; $('address').value=c.address||'';
+    }
+  };
 
   function renderSyncUI(){
     var out=$('syncSignedOut'), inEl=$('syncSignedIn');
@@ -365,10 +424,12 @@
     sb.auth.onAuthStateChange(function(event, session){
       sbUser = session ? session.user : null;
       renderSyncUI();
+      if(sbUser) loadClients();
     });
     sb.auth.getSession().then(function(s){
       sbUser = s.data.session ? s.data.session.user : null;
       renderSyncUI();
+      if(sbUser) loadClients();
     });
   }
 
@@ -395,7 +456,7 @@
     if(!sb || !sbUser || !batch.length) return;
     var rows = batch.map(function(o){
       return { id:o.src, data:{
-        title:o.title, customer:o.customer, phone:o.phone, email:o.email,
+        num:o.num, title:o.title, customer:o.customer, phone:o.phone, email:o.email,
         address:o.address, quote:o.quote, status:o.status, note:o.note
       }};
     });

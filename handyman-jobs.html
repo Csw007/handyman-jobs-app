@@ -723,6 +723,13 @@
       <input id="fTitle" placeholder="Replace kitchen mixer tap" autocomplete="off">
     </div>
     <div class="field">
+      <label class="lbl" for="fClientSel">Client</label>
+      <select id="fClientSel">
+        <option value="">Type new / one-off customer</option>
+        <option value="__new__">+ Add new client</option>
+      </select>
+    </div>
+    <div class="field">
       <label class="lbl" for="fCustomer">Customer</label>
       <input id="fCustomer" placeholder="Full name" autocomplete="name">
     </div>
@@ -1011,7 +1018,7 @@
     }
   };
 
-  var K_JOBS='hj:jobs', K_SET='hj:settings', K_PHOTOS=function(id){return 'hj:photos:'+id;};
+  var K_JOBS='hj:jobs', K_SET='hj:settings', K_CLIENTS='hj:clients', K_PHOTOS=function(id){return 'hj:photos:'+id;};
 
   var STATUSES=[
     {id:'quoted',   label:'Quoted',   open:true},
@@ -1022,7 +1029,7 @@
   ];
   function statusOf(id){ return STATUSES.filter(function(s){return s.id===id;})[0] || STATUSES[0]; }
 
-  var jobs=[], settings={}, filter='open', sortBy='new', current=null, editingId=null, photoCache={};
+  var jobs=[], settings={}, clients=[], filter='open', sortBy='new', current=null, editingId=null, photoCache={};
   var myPos=null, runPicks=[];
   var $ = function(id){ return document.getElementById(id); };
 
@@ -1109,6 +1116,10 @@
     if(e.key==='Escape' && !$('ask').hidden) closeAsk(false);
   });
   function pad(n){ return String(n).padStart(4,'0'); }
+  // Job numbers are usually auto-assigned, but the office can hand across
+  // its own (possibly non-numeric) number instead — this keeps the
+  // "highest number so far" scan from breaking on a non-numeric one.
+  function numOf(x){ var n=parseInt(x,10); return isFinite(n) ? n : 0; }
   function shortDate(iso){
     var d=new Date(iso);
     return d.toLocaleDateString(undefined,{day:'2-digit',month:'short'}).toUpperCase();
@@ -1515,7 +1526,8 @@
     var data = { title: subjectFor(current), text: bodyFor(current) };
     try{
       if(shots.length && navigator.canShare){
-        var files = shots.map(function(s,i){ return dataURLtoFile(s,'job-'+pad(current.num)+'-'+(i+1)+'.jpg'); });
+        var safeNum = pad(current.num).replace(/[\\/:*?"<>|]/g,'-');
+        var files = shots.map(function(s,i){ return dataURLtoFile(s,'job-'+safeNum+'-'+(i+1)+'.jpg'); });
         if(navigator.canShare({files:files})) data.files=files;
       }
       if(navigator.share){ await navigator.share(data); }
@@ -1570,7 +1582,36 @@
   };
 
   /* ---------------- form ---------------- */
-  var formStatus='quoted';
+  var formStatus='quoted', formClientId=null;
+
+  function renderClientOptions(selectedId){
+    var opts = ['<option value="">Type new / one-off customer</option>'];
+    clients.slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); })
+      .forEach(function(c){
+        opts.push('<option value="'+esc(c.id)+'"'+(c.id===selectedId?' selected':'')+'>'+esc(c.name||'Unnamed')+'</option>');
+      });
+    opts.push('<option value="__new__">+ Add new client</option>');
+    $('fClientSel').innerHTML = opts.join('');
+  }
+
+  $('fClientSel').onchange = function(){
+    var v = $('fClientSel').value;
+    if(v==='__new__'){
+      formClientId = '__new__';
+      $('fCustomer').value=''; $('fPhone').value=''; $('fEmail').value=''; $('fAddress').value='';
+      $('fCustomer').focus();
+      return;
+    }
+    formClientId = v || null;
+    var c = clients.filter(function(x){ return x.id===v; })[0];
+    if(c){
+      $('fCustomer').value = c.name||'';
+      $('fPhone').value = c.phone||'';
+      $('fEmail').value = c.email||'';
+      $('fAddress').value = c.address||'';
+    }
+  };
+
   function openForm(job){
     editingId = job? job.id : null;
     $('formTitle').textContent = job? ('Job #'+pad(job.num)) : 'New job';
@@ -1585,6 +1626,8 @@
     $('fNotesWrap').hidden = !!job;
     $('fNotesHint').hidden = !job;
     formStatus = job? job.status : 'quoted';
+    formClientId = job? (job.clientId||null) : null;
+    renderClientOptions(formClientId);
     paintFormStatus();
     show('viewForm');
     setTimeout(function(){ $('fTitle').focus(); },60);
@@ -1596,6 +1639,14 @@
     Array.prototype.forEach.call($('fStatus').querySelectorAll('button'), function(b){
       b.onclick=function(){ formStatus=b.getAttribute('data-s'); paintFormStatus(); };
     });
+  }
+
+  async function addClient(name, phone, email, address){
+    var c = { id:'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+              name:name||'', phone:phone||'', email:email||'', address:address||'' };
+    clients.push(c);
+    await saveClients();
+    return c.id;
   }
 
   async function saveForm(){
@@ -1611,6 +1662,11 @@
       rate:$('fRate').value.trim(),
       status:formStatus
     };
+    if(formClientId==='__new__' && payload.customer){
+      payload.clientId = await addClient(payload.customer, payload.phone, payload.email, payload.address);
+    } else {
+      payload.clientId = formClientId||null;
+    }
     if(editingId){
       var j=jobs.filter(function(x){return x.id===editingId;})[0];
       Object.keys(payload).forEach(function(k){ j[k]=payload[k]; });
@@ -1618,7 +1674,7 @@
       toast('Job updated');
       openDetail(j.id);
     } else {
-      var maxNum = jobs.reduce(function(m,x){ return Math.max(m,x.num||0); },0);
+      var maxNum = jobs.reduce(function(m,x){ return Math.max(m,numOf(x.num)); },0);
       payload.id = 'j'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
       payload.num = maxNum+1;
       payload.created = new Date().toISOString();
@@ -2454,14 +2510,18 @@
   // devices importing offline at the same time can't collide.
   async function absorbOfficeJobs(list){
     var added=0, skipped=0;
-    var maxNum = jobs.reduce(function(m,x){ return Math.max(m, x.num||0); }, 0);
+    var maxNum = jobs.reduce(function(m,x){ return Math.max(m, numOf(x.num)); }, 0);
     (list||[]).forEach(function(o){
       if(o.src && jobs.some(function(j){ return j.src===o.src; })){ skipped++; return; }
-      maxNum++;
+      // The office can hand across its own job number; only auto-assign
+      // one here if it didn't.
+      var jobNum;
+      if(o.num!=null && String(o.num).trim()){ jobNum = String(o.num).trim(); }
+      else { maxNum++; jobNum = maxNum; }
       jobs.unshift({
         id:'j'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
         src:o.src||null,
-        num:maxNum,
+        num:jobNum,
         created:new Date().toISOString(),
         title:o.title||'Untitled job',
         customer:o.customer||'', phone:o.phone||'', email:o.email||'',
@@ -2849,7 +2909,65 @@
     }catch(e){ /* offline or blocked — next interval will retry */ }
   }
 
-  async function syncNow(){ await pushJobs(); await pullJobs(); await pullIntake(); renderSyncUI(); }
+  var lastSavedClientsJSON = null;
+  var pushClientsTimer = null;
+
+  async function saveClients(){
+    var prevById = {};
+    (lastSavedClientsJSON ? JSON.parse(lastSavedClientsJSON) : []).forEach(function(c){ prevById[c.id]=c; });
+    clients.forEach(function(c){
+      var before = prevById[c.id];
+      if(!before || JSON.stringify(stripStamp(before)) !== JSON.stringify(stripStamp(c))){
+        c.updated_at = Date.now();
+      }
+    });
+    await store.set(K_CLIENTS, clients);
+    lastSavedClientsJSON = JSON.stringify(clients);
+    if(sbUser){ clearTimeout(pushClientsTimer); pushClientsTimer = setTimeout(pushClients, 3000); }
+  }
+
+  async function pushClients(){
+    if(!sb || !sbUser) return;
+    var rows = clients.map(function(c){
+      return { id:c.id, data:c, deleted:false, updated_at:new Date(c.updated_at||Date.now()).toISOString() };
+    });
+    if(!rows.length) return;
+    try{
+      var res = await sb.from('clients').upsert(rows, {onConflict:'id'});
+      if(res.error) throw res.error;
+    }catch(e){ /* offline or blocked — next debounce/interval will retry */ }
+  }
+
+  async function pullClients(){
+    if(!sb || !sbUser) return;
+    try{
+      var res = await sb.from('clients').select('id,data,updated_at');
+      if(res.error) throw res.error;
+      var localById = {}; clients.forEach(function(c){ localById[c.id]=c; });
+      var changed = false;
+      (res.data||[]).forEach(function(row){
+        var remoteUpdated = row.updated_at ? Date.parse(row.updated_at) : 0;
+        var local = localById[row.id];
+        if(!local){
+          clients.push(Object.assign({}, row.data, {updated_at: remoteUpdated}));
+          changed = true;
+        } else if(remoteUpdated > (local.updated_at||0)){
+          Object.assign(local, row.data, {updated_at: remoteUpdated});
+          changed = true;
+        }
+      });
+      if(changed){
+        await store.set(K_CLIENTS, clients);
+        lastSavedClientsJSON = JSON.stringify(clients);
+      }
+    }catch(e){ /* offline or blocked — next interval will retry */ }
+  }
+
+  async function syncNow(){
+    await pushJobs(); await pullJobs(); await pullIntake();
+    await pushClients(); await pullClients();
+    renderSyncUI();
+  }
 
   function fmtSyncTime(){
     if(!lastSyncAt) return 'Not synced yet';
@@ -2907,8 +3025,11 @@
   (async function(){
     jobs = (await store.get(K_JOBS)) || [];
     settings = (await store.get(K_SET)) || {};
+    clients = (await store.get(K_CLIENTS)) || [];
     jobs.forEach(function(j){ if(!j.updated_at) j.updated_at = Date.parse(j.created) || Date.now(); });
+    clients.forEach(function(c){ if(!c.updated_at) c.updated_at = Date.now(); });
     lastSavedJobsJSON = JSON.stringify(jobs);
+    lastSavedClientsJSON = JSON.stringify(clients);
     applyTheme();
     if(migrateNotes()) await saveJobs();
     if(settings.name){ $('bizName').textContent=settings.name; document.title=settings.name; }
