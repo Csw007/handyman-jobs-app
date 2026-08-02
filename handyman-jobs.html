@@ -700,7 +700,7 @@
 
     <h3 class="shead">Send it</h3>
     <div class="actions">
-      <a class="btn" id="dEmail" href="#">
+      <a class="btn" id="dEmail" href="#" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/></svg>
         Email customer
       </a>
@@ -710,8 +710,8 @@
       </button>
       <button class="btn ghost small" id="dCopy">Copy details</button>
     </div>
-    <p class="hint">The email button fills in the subject and body for you. Photos can't ride along on an email link — use <strong>Share with photos</strong> to send them as attachments.</p>
-    <p class="hint">If <strong>Email customer</strong> doesn't open anything, try <a id="dGmail" href="#" target="_blank" rel="noopener">Open in Gmail</a> instead, or <button class="link-btn" id="dShowText" type="button">show the text</button> and copy it into whatever app you use.</p>
+    <p class="hint">The email button opens Gmail on the web with the subject and body filled in. Photos can't ride along on an email link — use <strong>Share with photos</strong> to send them as attachments.</p>
+    <p class="hint">Using a different mail app? Try <a id="dMailto" href="#">your device's mail app</a> instead, or <button class="link-btn" id="dShowText" type="button">show the text</button> and copy it into whatever app you use.</p>
     <div id="dTextPanel" hidden>
       <div class="field">
         <label class="lbl" for="dTextSubject">Subject</label>
@@ -1469,11 +1469,15 @@
       '&su='+encodeURIComponent(subjectFor(j))+
       '&body='+encodeURIComponent(bodyFor(j));
   }
-  // Keeps the email button, the Gmail-web fallback link, and the plain-text
+  // Keeps the email button, the mailto fallback link, and the plain-text
   // panel all in sync whenever the job's details change.
+  // Gmail-web is the primary path, not mailto: — on this phone, tapping a
+  // mailto: link does nothing at all (no app, no chooser), while the Gmail
+  // compose URL works every time. mailto stays as a secondary option since
+  // it may work fine on other devices/mail apps.
   function renderSendIt(j){
-    $('dEmail').href = mailtoFor(j);
-    $('dGmail').href = gmailWebFor(j);
+    $('dEmail').href = gmailWebFor(j);
+    $('dMailto').href = mailtoFor(j);
     $('dTextSubject').value = subjectFor(j);
     $('dTextBody').value = bodyFor(j);
   }
