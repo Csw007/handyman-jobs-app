@@ -59,6 +59,11 @@
   .lbl{display:block; font-size:13px; font-weight:500; color:var(--ink-2); margin-bottom:7px}
   .meta{font-family:var(--mono); font-size:11px; letter-spacing:.02em; color:var(--ink-3); font-variant-numeric:tabular-nums}
   .hint{font-size:13px; line-height:1.5; color:var(--ink-2); margin:10px 0 0}
+  .hint a, .link-btn{
+    color:var(--ink-2); border-bottom:1px solid var(--line); text-decoration:none;
+    background:none; border-top:0; border-left:0; border-right:0; padding:0;
+    font:inherit; cursor:pointer;
+  }
   .shead{
     font-size:13px; font-weight:600; color:var(--ink-3);
     margin:32px 0 12px; letter-spacing:-.005em;
@@ -706,6 +711,20 @@
       <button class="btn ghost small" id="dCopy">Copy details</button>
     </div>
     <p class="hint">The email button fills in the subject and body for you. Photos can't ride along on an email link — use <strong>Share with photos</strong> to send them as attachments.</p>
+    <p class="hint">If <strong>Email customer</strong> doesn't open anything, try <a id="dGmail" href="#" target="_blank" rel="noopener">Open in Gmail</a> instead, or <button class="link-btn" id="dShowText" type="button">show the text</button> and copy it into whatever app you use.</p>
+    <div id="dTextPanel" hidden>
+      <div class="field">
+        <label class="lbl" for="dTextSubject">Subject</label>
+        <input id="dTextSubject" readonly>
+      </div>
+      <div class="field">
+        <label class="lbl" for="dTextBody">Body</label>
+        <textarea id="dTextBody" readonly style="min-height:180px"></textarea>
+      </div>
+      <div class="actions" style="margin:0">
+        <button class="btn ghost small" id="dTextCopy">Copy text</button>
+      </div>
+    </div>
 
     <h3 class="shead">Manage</h3>
     <div class="actions">
@@ -1288,7 +1307,9 @@
     renderParts(j);
     $('tManual').hidden=true;
     $('pForm').hidden=true;
-    $('dEmail').href = mailtoFor(j);
+    renderSendIt(j);
+    $('dTextPanel').hidden=true;
+    $('dShowText').textContent='show the text';
     await renderPhotos(j.id);
     show('viewDetail');
   }
@@ -1435,9 +1456,26 @@
     return (settings.name? settings.name+' — ':'') + (j.title||'Your job') + ' (#'+pad(j.num)+')';
   }
   function mailtoFor(j){
-    return 'mailto:'+encodeURIComponent(j.email||'')+
+    // The address itself isn't percent-encoded — some Android mail apps
+    // reject a mailto: whose "to" part is escaped (bob%40example.com).
+    // Subject/body still need encoding since they're query parameters.
+    return 'mailto:'+(j.email||'')+
       '?subject='+encodeURIComponent(subjectFor(j))+
       '&body='+encodeURIComponent(bodyFor(j));
+  }
+  function gmailWebFor(j){
+    return 'https://mail.google.com/mail/?view=cm&fs=1'+
+      '&to='+encodeURIComponent(j.email||'')+
+      '&su='+encodeURIComponent(subjectFor(j))+
+      '&body='+encodeURIComponent(bodyFor(j));
+  }
+  // Keeps the email button, the Gmail-web fallback link, and the plain-text
+  // panel all in sync whenever the job's details change.
+  function renderSendIt(j){
+    $('dEmail').href = mailtoFor(j);
+    $('dGmail').href = gmailWebFor(j);
+    $('dTextSubject').value = subjectFor(j);
+    $('dTextBody').value = bodyFor(j);
   }
 
   /* ---------------- photos ---------------- */
@@ -1570,6 +1608,12 @@
     document.body.removeChild(ta);
   }
   $('dCopy').onclick = copyDetails;
+  $('dTextCopy').onclick = copyDetails;
+  $('dShowText').onclick = function(){
+    var panel = $('dTextPanel');
+    panel.hidden = !panel.hidden;
+    $('dShowText').textContent = panel.hidden ? 'show the text' : 'hide the text';
+  };
 
   $('dEdit').onclick = function(){ openForm(current); };
   $('dDelete').onclick = async function(){
@@ -2296,7 +2340,7 @@
         j.log[i].s = !j.log[i].s;
         await saveJobs();
         renderNotes(j);
-        $('dEmail').href = mailtoFor(j);
+        renderSendIt(j);
         toast(j.log[i].s ? 'Will be included in the email' : 'Kept private');
       };
     });
@@ -2308,7 +2352,7 @@
         j.log.splice(i,1);
         await saveJobs();
         renderNotes(j);
-        $('dEmail').href = mailtoFor(j);
+        renderSendIt(j);
         toast('Note deleted');
       };
     });
@@ -2357,7 +2401,7 @@
     await saveJobs();
     closeNoteForm();
     renderNotes(current);
-    $('dEmail').href = mailtoFor(current);
+    renderSendIt(current);
   };
 
   /* Older jobs kept one lump of text in `notes`. Move it into the log so
